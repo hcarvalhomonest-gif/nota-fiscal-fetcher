@@ -33,6 +33,7 @@
 
 import "dotenv/config";
 import { gunzipSync } from "node:zlib";
+import * as tls from "node:tls";
 import { Agent, fetch as undiciFetch } from "undici";
 import forge from "node-forge";
 import { ZodError } from "zod";
