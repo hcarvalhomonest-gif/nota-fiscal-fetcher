@@ -14,6 +14,7 @@ const signInSchema = z.object({
   email: z.string().trim().email("Email inválido").max(255),
   password: z.string().min(6, "Mínimo 6 caracteres").max(128),
 });
+type SignInData = z.infer<typeof signInSchema>;
 const signUpSchema = signInSchema.extend({
   fullName: z.string().trim().min(2, "Informe seu nome").max(120),
 });
@@ -32,7 +33,7 @@ const Auth = () => {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword(parsed.data);
+    const { error } = await supabase.auth.signInWithPassword(parsed.data as SignInData);
     setLoading(false);
     if (error) {
       toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
