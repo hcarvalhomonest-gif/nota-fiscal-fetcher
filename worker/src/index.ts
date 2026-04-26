@@ -127,11 +127,16 @@ function pfxToPem(pfxBase64: string, password: string): ParsedPfx {
 
 /** Cria um Agent do undici com mTLS configurado (cadeia ICP-Brasil). */
 function createMtlsAgent(pfx: ParsedPfx): Agent {
+  // Junta os CAs do sistema (Mozilla bundle do Node) com os CAs intermediários
+  // que vieram dentro do .pfx — necessário para validar a cadeia ICP-Brasil
+  // do servidor adn.nfse.gov.br.
+  const systemCAs = tls.rootCertificates;
+  const allCAs = [...systemCAs, ...pfx.caPems];
   return new Agent({
     connect: {
       cert: pfx.certPem,
       key: pfx.keyPem,
-      ca: pfx.caPems.length > 0 ? pfx.caPems.join("\n") : undefined,
+      ca: allCAs,
       rejectUnauthorized: true,
     },
   });
