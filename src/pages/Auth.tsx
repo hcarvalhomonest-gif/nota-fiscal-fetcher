@@ -33,7 +33,8 @@ const Auth = () => {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword(parsed.data as SignInData);
+    const { email, password } = parsed.data;
+    const { error } = await supabase.auth.signInWithPassword({ email: email!, password: password! });
     setLoading(false);
     if (error) {
       toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
