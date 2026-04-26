@@ -14,16 +14,277 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      certificates: {
+        Row: {
+          company_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          owner_id: string
+          password_encrypted: string
+          password_iv: string
+          storage_path: string
+          subject_name: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          owner_id: string
+          password_encrypted: string
+          password_iv: string
+          storage_path: string
+          subject_name?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          owner_id?: string
+          password_encrypted?: string
+          password_iv?: string
+          storage_path?: string
+          subject_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          cnpj: string
+          created_at: string
+          id: string
+          legal_name: string
+          municipality: string | null
+          owner_id: string
+          state: string | null
+          trade_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj: string
+          created_at?: string
+          id?: string
+          legal_name: string
+          municipality?: string | null
+          owner_id: string
+          state?: string | null
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string
+          created_at?: string
+          id?: string
+          legal_name?: string
+          municipality?: string | null
+          owner_id?: string
+          state?: string | null
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      download_jobs: {
+        Row: {
+          certificate_id: string
+          company_id: string
+          created_at: string
+          downloaded_invoices: number
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          owner_id: string
+          period_end: string
+          period_start: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          total_invoices: number
+          worker_token: string | null
+        }
+        Insert: {
+          certificate_id: string
+          company_id: string
+          created_at?: string
+          downloaded_invoices?: number
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          owner_id: string
+          period_end: string
+          period_start: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          total_invoices?: number
+          worker_token?: string | null
+        }
+        Update: {
+          certificate_id?: string
+          company_id?: string
+          created_at?: string
+          downloaded_invoices?: number
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          owner_id?: string
+          period_end?: string
+          period_start?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          total_invoices?: number
+          worker_token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "download_jobs_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "download_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          chave_acesso: string | null
+          created_at: string
+          data_emissao: string | null
+          id: string
+          job_id: string
+          numero: string | null
+          owner_id: string
+          pdf_path: string | null
+          serie: string | null
+          tomador_documento: string | null
+          tomador_nome: string | null
+          valor_total: number | null
+          xml_path: string | null
+        }
+        Insert: {
+          chave_acesso?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          id?: string
+          job_id: string
+          numero?: string | null
+          owner_id: string
+          pdf_path?: string | null
+          serie?: string | null
+          tomador_documento?: string | null
+          tomador_nome?: string | null
+          valor_total?: number | null
+          xml_path?: string | null
+        }
+        Update: {
+          chave_acesso?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          id?: string
+          job_id?: string
+          numero?: string | null
+          owner_id?: string
+          pdf_path?: string | null
+          serie?: string | null
+          tomador_documento?: string | null
+          tomador_nome?: string | null
+          valor_total?: number | null
+          xml_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "download_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      job_status:
+        | "pending"
+        | "processing"
+        | "completed"
+        | "failed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +411,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      job_status: ["pending", "processing", "completed", "failed", "cancelled"],
+    },
   },
 } as const
