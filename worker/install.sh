@@ -45,7 +45,7 @@ fi
 
 log "Instalando dependências do worker"
 cd "${WORKER_DIR}"
-npm install --omit=dev --no-audit --no-fund
+npm install --no-audit --no-fund
 
 if [[ ! -f "${WORKER_DIR}/.env" ]]; then
   log "Criando .env inicial (lembre de preencher o WORKER_SHARED_SECRET)"
