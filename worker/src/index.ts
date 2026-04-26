@@ -1,31 +1,48 @@
 /**
- * NotaSync Worker
- * ----------------
+ * NotaSync Worker — Sistema Nacional NFS-e (ADN)
+ * ------------------------------------------------
  * Roda numa VPS sua. Faz polling em /worker-claim-job, recebe o certificado
- * A1 (PFX em base64) + senha + período, autentica no portal nacional NFS-e
- * via mTLS, baixa cada NFS-e (XML + DANFSe PDF) e reporta de volta via
- * /worker-report.
+ * A1 (PFX em base64) + senha + período, autentica no Ambiente de Dados
+ * Nacional (ADN) da Receita Federal via mTLS e baixa em lote os XMLs
+ * (descompactando o gzip) e os PDFs (DANFSe) de cada NFS-e emitida no
+ * período. Reporta cada nota e o resultado final via /worker-report.
  *
- * IMPORTANTE: este é um esqueleto funcional. Os endpoints específicos do
- * portal nacional NFS-e variam conforme o que você precisa consultar
- * (NFS-e por período do prestador, por chave de acesso, etc.). Veja a
- * documentação oficial em:
- *   https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/apis-prod-restrita-e-producao
+ * Protocolo real do ADN (validado contra a doc oficial e a lib python
+ * `dfe-nfse`):
  *
- * Adapte a função `listAndDownloadInvoices` para consumir o(s) endpoint(s)
- * que você precisa.
+ *   GET https://adn.nfse.gov.br/contribuintes/dfe/{nsu}?cnpjConsulta={cnpj}&lote=true
+ *     -> 200 { "LoteDFe": [
+ *           { "NSU": <int>, "ChaveAcesso": "...", "DataHoraGeracao": "ISO-8601",
+ *             "ArquivoXml": "<base64(gzip(xml))>" }, ...
+ *        ] }
+ *     -> 404 quando não há mais documentos a partir daquele NSU
+ *
+ *   GET https://adn.nfse.gov.br/danfse/{chave}
+ *     -> 200 application/pdf
+ *
+ * Observações:
+ *  - A consulta é paginada por NSU (Número Sequencial Único), não por data.
+ *    O período pedido pelo usuário é aplicado sobre o campo de emissão lido
+ *    do XML (`dhEmi` / `DataHoraGeracao`).
+ *  - O XML vem dentro do JSON, base64-encoded e comprimido com gzip.
+ *  - Em produção restrita (homologação), troque NFSE_BASE_URL para
+ *    https://adn.producaorestrita.nfse.gov.br
+ *
+ * Doc oficial: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/apis-prod-restrita-e-producao
  */
 
 import "dotenv/config";
+import { gunzipSync } from "node:zlib";
 import { Agent, fetch as undiciFetch } from "undici";
 import forge from "node-forge";
 
 const {
   SUPABASE_FUNCTIONS_URL,
   WORKER_SHARED_SECRET,
-  NFSE_BASE_URL = "https://sefin.nfse.gov.br/SefinNacional",
-  NFSE_DANFSE_URL = "https://adn.nfse.gov.br/danfse",
+  NFSE_BASE_URL = "https://adn.nfse.gov.br",
   POLL_INTERVAL_MS = "10000",
+  MAX_PAGES = "1000",
+  REQUEST_DELAY_MS = "250",
 } = process.env;
 
 if (!SUPABASE_FUNCTIONS_URL || !WORKER_SHARED_SECRET) {
@@ -34,6 +51,8 @@ if (!SUPABASE_FUNCTIONS_URL || !WORKER_SHARED_SECRET) {
 }
 
 const POLL_MS = parseInt(POLL_INTERVAL_MS, 10);
+const MAX_PAGES_N = parseInt(MAX_PAGES, 10);
+const REQ_DELAY = parseInt(REQUEST_DELAY_MS, 10);
 
 // ---------- Tipos ----------
 interface JobPayload {
@@ -42,7 +61,7 @@ interface JobPayload {
     worker_token: string;
     owner_id: string;
     period_start: string; // YYYY-MM-DD
-    period_end: string;
+    period_end: string;   // YYYY-MM-DD
   };
   company: {
     id: string;
@@ -61,7 +80,24 @@ interface ParsedPfx {
   caPems: string[];
 }
 
+interface LoteDFeItem {
+  NSU: number;
+  ChaveAcesso: string;
+  DataHoraGeracao: string;
+  ArquivoXml: string; // base64(gzip(xml))
+}
+
+interface LoteDFeResponse {
+  LoteDFe?: LoteDFeItem[];
+}
+
 // ---------- Helpers ----------
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function normalizarCnpj(cnpj: string): string {
+  return cnpj.replace(/\D/g, "");
+}
 
 /** Converte PFX (PKCS#12) em PEM (cert + key + CA chain) usando node-forge. */
 function pfxToPem(pfxBase64: string, password: string): ParsedPfx {
@@ -69,10 +105,14 @@ function pfxToPem(pfxBase64: string, password: string): ParsedPfx {
   const p12Asn1 = forge.asn1.fromDer(pfxDer);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, password);
 
-  const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] ?? [];
+  const certBags =
+    p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] ?? [];
   const keyBags =
-    p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] ??
-    p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] ?? [];
+    p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[
+      forge.pki.oids.pkcs8ShroudedKeyBag
+    ] ??
+    p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] ??
+    [];
 
   if (certBags.length === 0 || keyBags.length === 0) {
     throw new Error("PFX inválido: não foi possível extrair cert/key");
@@ -86,15 +126,13 @@ function pfxToPem(pfxBase64: string, password: string): ParsedPfx {
   return { certPem, keyPem, caPems };
 }
 
-/** Cria um Agent do undici com mTLS configurado. */
+/** Cria um Agent do undici com mTLS configurado (cadeia ICP-Brasil). */
 function createMtlsAgent(pfx: ParsedPfx): Agent {
   return new Agent({
     connect: {
       cert: pfx.certPem,
       key: pfx.keyPem,
       ca: pfx.caPems.length > 0 ? pfx.caPems.join("\n") : undefined,
-      // O portal nacional usa cadeia ICP-Brasil. Em produção, configure as
-      // CAs corretas. Para iniciar, mantenha rejectUnauthorized = true.
       rejectUnauthorized: true,
     },
   });
@@ -132,100 +170,177 @@ async function report(payload: Record<string, unknown>) {
 
 function bytesToB64(buf: ArrayBuffer | Uint8Array): string {
   const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let bin = "";
-  for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
-  return Buffer.from(bin, "binary").toString("base64");
+  return Buffer.from(u8).toString("base64");
 }
 
-// ---------- NFS-e Nacional ----------
+/** Descomprime ArquivoXml (base64 -> gzip -> utf-8). */
+function descompactarXml(arquivoXmlB64: string): { xmlText: string; xmlBytes: Uint8Array } {
+  const gzipped = Buffer.from(arquivoXmlB64, "base64");
+  const xmlBuf = gunzipSync(gzipped);
+  return { xmlText: xmlBuf.toString("utf8"), xmlBytes: new Uint8Array(xmlBuf) };
+}
+
+/** Extrai metadados básicos do XML da NFS-e (formato padrão nacional). */
+function parseNfseMeta(xmlText: string) {
+  const get = (tag: string) =>
+    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`).exec(xmlText)?.[1]?.trim() ?? null;
+
+  const numero = get("nNFSe") ?? get("NumeroNFSe") ?? get("Numero");
+  const serie = get("serie") ?? get("Serie");
+  const dhEmi = get("dhEmi") ?? get("DataEmissao");
+  const valor = get("vLiq") ?? get("vNF") ?? get("ValorLiquidoNfse") ?? get("ValorServicos");
+
+  // Tomador: o XML padrão nacional tem o bloco <toma>...</toma>; tentamos
+  // tanto o nome quanto o documento (CNPJ ou CPF) dentro desse bloco
+  const tomBlock =
+    /<toma>([\s\S]*?)<\/toma>/.exec(xmlText)?.[1] ??
+    /<Tomador>([\s\S]*?)<\/Tomador>/.exec(xmlText)?.[1] ??
+    "";
+  const tomNome =
+    /<xNome>([\s\S]*?)<\/xNome>/.exec(tomBlock)?.[1]?.trim() ??
+    /<RazaoSocial>([\s\S]*?)<\/RazaoSocial>/.exec(tomBlock)?.[1]?.trim() ??
+    null;
+  const tomDoc =
+    /<CNPJ>([\s\S]*?)<\/CNPJ>/.exec(tomBlock)?.[1]?.trim() ??
+    /<CPF>([\s\S]*?)<\/CPF>/.exec(tomBlock)?.[1]?.trim() ??
+    null;
+
+  return {
+    numero,
+    serie,
+    dhEmi,
+    valor: valor ? Number(valor.replace(",", ".")) : null,
+    tomNome,
+    tomDoc,
+  };
+}
+
+/** True se a data ISO `iso` cai dentro de [start, end] (datas YYYY-MM-DD inclusivas). */
+function dentroDoPeriodo(iso: string | null, start: string, end: string): boolean {
+  if (!iso) return true; // sem data confiável: aceita
+  const d = iso.slice(0, 10); // YYYY-MM-DD
+  return d >= start && d <= end;
+}
+
+// ---------- ADN: paginação por NSU ----------
 
 /**
- * AQUI VAI A INTEGRAÇÃO REAL.
+ * Consulta o ADN paginando por NSU. A cada página, decodifica o XML do lote,
+ * filtra pelo período do job, baixa o DANFSe e reporta a nota.
  *
- * Endpoints típicos do SEFIN Nacional (consulte sempre a doc oficial,
- * pois a Receita atualiza a especificação periodicamente):
- *
- *   GET  {NFSE_BASE_URL}/nfse?cnpj=...&dataInicial=...&dataFinal=...
- *   GET  {NFSE_BASE_URL}/nfse/{chaveAcesso}        -> retorna XML
- *   GET  {NFSE_DANFSE_URL}/danfse/{chaveAcesso}    -> retorna PDF do DANFSe
- *
- * Se o endpoint exigir outro formato, ajuste abaixo.
+ * Retorna o total de notas reportadas (dentro do período).
  */
-async function listAndDownloadInvoices(
-  job: JobPayload,
-  agent: Agent,
-): Promise<{ count: number }> {
+async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<number> {
   const { company, job: j } = job;
-  const cnpj = company.cnpj.replace(/\D/g, "");
+  const cnpj = normalizarCnpj(company.cnpj);
 
-  // 1) Listar chaves de acesso emitidas no período
-  const listUrl = `${NFSE_BASE_URL}/nfse?cnpj=${cnpj}&dataInicial=${j.period_start}&dataFinal=${j.period_end}`;
-  console.log("[job", j.id, "] GET", listUrl);
+  // Sempre começamos do NSU 0 — o ADN devolve em ordem crescente. Para um
+  // worker incremental no futuro, persistir o último NSU por empresa.
+  let nsu = 0;
+  let pageCount = 0;
+  let totalReportadas = 0;
+  let passouDoPeriodo = false;
 
-  const listRes = await undiciFetch(listUrl, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    dispatcher: agent,
-  });
+  while (pageCount < MAX_PAGES_N && !passouDoPeriodo) {
+    const url = `${NFSE_BASE_URL}/contribuintes/dfe/${nsu}?cnpjConsulta=${cnpj}&lote=true`;
+    console.log("[job", j.id, "] GET", url);
 
-  if (!listRes.ok) {
-    throw new Error(`Listagem falhou: ${listRes.status} ${await listRes.text()}`);
-  }
-  // O retorno real precisa ser parseado conforme a doc — aqui assumimos
-  // um JSON com `{ chaves: ["3525...","3525..."] }`. ADAPTE.
-  const list = (await listRes.json()) as { chaves?: string[]; nfses?: { chaveAcesso: string }[] };
-  const chaves = list.chaves ?? list.nfses?.map((n) => n.chaveAcesso) ?? [];
-  console.log("[job", j.id, "] notas encontradas:", chaves.length);
+    const res = await undiciFetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      dispatcher: agent,
+    });
 
-  // 2) Para cada chave, baixar XML e PDF e reportar
-  let count = 0;
-  for (const chave of chaves) {
-    try {
-      const xmlRes = await undiciFetch(`${NFSE_BASE_URL}/nfse/${chave}`, {
-        method: "GET",
-        headers: { Accept: "application/xml" },
-        dispatcher: agent,
-      });
-      const xmlBytes = new Uint8Array(await xmlRes.arrayBuffer());
-
-      const pdfRes = await undiciFetch(`${NFSE_DANFSE_URL}/danfse/${chave}`, {
-        method: "GET",
-        headers: { Accept: "application/pdf" },
-        dispatcher: agent,
-      });
-      const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
-
-      // Parse mínimo do XML (numero, data, valor, tomador) — opcional.
-      const xmlText = new TextDecoder().decode(xmlBytes);
-      const numero = /<nNFSe>(.*?)<\/nNFSe>/.exec(xmlText)?.[1] ?? null;
-      const dataEm = /<dhEmi>(.*?)<\/dhEmi>/.exec(xmlText)?.[1] ?? null;
-      const valor = /<vLiq>(.*?)<\/vLiq>/.exec(xmlText)?.[1] ?? null;
-      const tomNome = /<xNome>(.*?)<\/xNome>/.exec(xmlText)?.[1] ?? null;
-      const tomDoc =
-        /<CNPJ>(.*?)<\/CNPJ>/.exec(xmlText)?.[1] ??
-        /<CPF>(.*?)<\/CPF>/.exec(xmlText)?.[1] ?? null;
-
-      await report({
-        job_id: j.id,
-        worker_token: j.worker_token,
-        action: "add_invoice",
-        invoice: {
-          chave_acesso: chave,
-          numero,
-          data_emissao: dataEm,
-          tomador_nome: tomNome,
-          tomador_documento: tomDoc,
-          valor_total: valor ? parseFloat(valor) : null,
-          xml_base64: bytesToB64(xmlBytes),
-          pdf_base64: bytesToB64(pdfBytes),
-        },
-      });
-      count++;
-    } catch (e) {
-      console.error("falha na nota", chave, e);
+    // 404 = não há mais documentos a partir desse NSU → fim da paginação
+    if (res.status === 404) {
+      console.log("[job", j.id, "] fim da paginação (404 a partir do NSU", nsu, ")");
+      break;
     }
+    if (res.status === 429) {
+      console.warn("[job", j.id, "] 429 throttle, aguardando 5s");
+      await sleep(5000);
+      continue;
+    }
+    if (!res.ok) {
+      throw new Error(`Listagem falhou (NSU ${nsu}): ${res.status} ${await res.text()}`);
+    }
+
+    const data = (await res.json()) as LoteDFeResponse;
+    const lotes = data.LoteDFe ?? [];
+    if (lotes.length === 0) {
+      console.log("[job", j.id, "] lote vazio, fim");
+      break;
+    }
+
+    for (const item of lotes) {
+      try {
+        const { xmlText, xmlBytes } = descompactarXml(item.ArquivoXml);
+        const meta = parseNfseMeta(xmlText);
+        // Preferir a data do XML; cair para DataHoraGeracao do envelope
+        const dataRef = meta.dhEmi ?? item.DataHoraGeracao ?? null;
+
+        // Otimização: o ADN entrega em ordem crescente de NSU (≈ ordem de
+        // geração). Se já passamos do fim do período, encerra paginação.
+        if (dataRef && dataRef.slice(0, 10) > j.period_end) {
+          passouDoPeriodo = true;
+          break;
+        }
+        if (!dentroDoPeriodo(dataRef, j.period_start, j.period_end)) {
+          continue;
+        }
+
+        // Baixar DANFSe (PDF). Se falhar, prossegue só com o XML.
+        let pdfB64: string | null = null;
+        try {
+          const pdfRes = await undiciFetch(`${NFSE_BASE_URL}/danfse/${item.ChaveAcesso}`, {
+            method: "GET",
+            headers: { Accept: "application/pdf" },
+            dispatcher: agent,
+          });
+          if (pdfRes.ok) {
+            pdfB64 = bytesToB64(await pdfRes.arrayBuffer());
+          } else {
+            console.warn("DANFSe falhou", item.ChaveAcesso, pdfRes.status);
+          }
+        } catch (e) {
+          console.warn("DANFSe erro", item.ChaveAcesso, e);
+        }
+
+        await report({
+          job_id: j.id,
+          worker_token: j.worker_token,
+          action: "add_invoice",
+          invoice: {
+            chave_acesso: item.ChaveAcesso,
+            numero: meta.numero,
+            serie: meta.serie,
+            data_emissao: dataRef,
+            tomador_nome: meta.tomNome,
+            tomador_documento: meta.tomDoc,
+            valor_total: meta.valor,
+            xml_base64: bytesToB64(xmlBytes),
+            pdf_base64: pdfB64,
+          },
+        });
+        totalReportadas++;
+        await sleep(REQ_DELAY);
+      } catch (e) {
+        console.error("falha ao processar item NSU", item.NSU, e);
+      }
+    }
+
+    // Próxima página: o NSU "alto" do lote atual + 1
+    const ultimoNsu = lotes[lotes.length - 1].NSU;
+    if (ultimoNsu <= nsu) {
+      console.log("[job", j.id, "] NSU não avançou, encerrando");
+      break;
+    }
+    nsu = ultimoNsu;
+    pageCount++;
+    await sleep(REQ_DELAY);
   }
-  return { count };
+
+  return totalReportadas;
 }
 
 // ---------- Loop ----------
@@ -236,12 +351,12 @@ async function processJob(job: JobPayload) {
   try {
     const pfx = pfxToPem(job.certificate.pfx_base64, job.certificate.password);
     agent = createMtlsAgent(pfx);
-    const { count } = await listAndDownloadInvoices(job, agent);
+    const total = await listAndDownloadInvoices(job, agent);
     await report({
       job_id: job.job.id,
       worker_token: job.job.worker_token,
       action: "finish",
-      total_invoices: count,
+      total_invoices: total,
     });
   } catch (e) {
     console.error("job failed", e);
@@ -269,7 +384,7 @@ async function main() {
     } catch (e) {
       console.error(e);
     }
-    await new Promise((r) => setTimeout(r, POLL_MS));
+    await sleep(POLL_MS);
   }
 }
 
