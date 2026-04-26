@@ -1,1 +1,13 @@
 project_id = "cwxsalprevqrtimkgxwo"
+
+[functions.upload-certificate]
+verify_jwt = false
+
+[functions.create-job]
+verify_jwt = false
+
+[functions.worker-claim-job]
+verify_jwt = false
+
+[functions.worker-report]
+verify_jwt = false
