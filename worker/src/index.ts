@@ -228,17 +228,54 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
       throw new Error(`Listagem falhou (NSU ${nsu}): ${res.status} ${await res.text()}`);
     }
 
-    const data = (await res.json()) as LoteDFeResponse;
-    const lotes = data.LoteDFe ?? [];
+    // Validação ESTRITA do envelope com Zod (loga em detalhes e aborta o job
+    // se o schema mudar — melhor falhar do que ingerir lixo silenciosamente)
+    let data: LoteDFeResponse;
+    try {
+      const json = await res.json();
+      data = loteDFeResponseSchema.parse(json);
+    } catch (e) {
+      if (e instanceof ZodError) {
+        const issues = e.issues
+          .slice(0, 5)
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .join("; ");
+        throw new Error(`Schema do ADN inválido (NSU ${nsu}): ${issues}`);
+      }
+      throw e;
+    }
+    const lotes = data.LoteDFe;
     if (lotes.length === 0) {
       console.log("[job", j.id, "] lote vazio, fim");
       break;
     }
 
-    for (const item of lotes) {
+    for (const item of lotes as LoteDFeItem[]) {
       try {
+        // Pular eventos (cancelamento/substituição vêm como itens próprios sem
+        // ChaveAcesso de NFS-e mas com tpEvento + chNFSe). Atualizamos a nota
+        // existente como cancelada via campo `cancelada` quando o XML for da
+        // própria NFS-e cancelada (ver parser).
+        if (item.tpEvento && !item.ChaveAcesso) {
+          console.log(
+            "[job", j.id, "] evento ignorado tpEvento=", item.tpEvento,
+            "chNFSe=", item.chNFSe, "NSU=", item.NSU,
+          );
+          continue;
+        }
+
         const { xmlText, xmlBytes } = descompactarXml(item.ArquivoXml);
-        const meta = parseNfseMeta(xmlText);
+        const meta = parseNfseXml(xmlText);
+
+        // Coerência: se o JSON traz ChaveAcesso, deve bater com a do XML
+        if (item.ChaveAcesso && meta.chaveAcesso && item.ChaveAcesso !== meta.chaveAcesso) {
+          console.warn(
+            "[job", j.id, "] ChaveAcesso diverge entre envelope e XML",
+            { envelope: item.ChaveAcesso, xml: meta.chaveAcesso, nsu: item.NSU },
+          );
+        }
+        const chave = meta.chaveAcesso ?? item.ChaveAcesso ?? null;
+
         // Preferir a data do XML; cair para DataHoraGeracao do envelope
         const dataRef = meta.dhEmi ?? item.DataHoraGeracao ?? null;
 
@@ -254,19 +291,21 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
 
         // Baixar DANFSe (PDF). Se falhar, prossegue só com o XML.
         let pdfB64: string | null = null;
-        try {
-          const pdfRes = await undiciFetch(`${NFSE_BASE_URL}/danfse/${item.ChaveAcesso}`, {
-            method: "GET",
-            headers: { Accept: "application/pdf" },
-            dispatcher: agent,
-          });
-          if (pdfRes.ok) {
-            pdfB64 = bytesToB64(await pdfRes.arrayBuffer());
-          } else {
-            console.warn("DANFSe falhou", item.ChaveAcesso, pdfRes.status);
+        if (chave) {
+          try {
+            const pdfRes = await undiciFetch(`${NFSE_BASE_URL}/danfse/${chave}`, {
+              method: "GET",
+              headers: { Accept: "application/pdf" },
+              dispatcher: agent,
+            });
+            if (pdfRes.ok) {
+              pdfB64 = bytesToB64(await pdfRes.arrayBuffer());
+            } else {
+              console.warn("DANFSe falhou", chave, pdfRes.status);
+            }
+          } catch (e) {
+            console.warn("DANFSe erro", chave, e);
           }
-        } catch (e) {
-          console.warn("DANFSe erro", item.ChaveAcesso, e);
         }
 
         await report({
@@ -274,13 +313,40 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
           worker_token: j.worker_token,
           action: "add_invoice",
           invoice: {
-            chave_acesso: item.ChaveAcesso,
+            // Identificação
+            nsu: item.NSU,
+            chave_acesso: chave,
             numero: meta.numero,
             serie: meta.serie,
             data_emissao: dataRef,
-            tomador_nome: meta.tomNome,
-            tomador_documento: meta.tomDoc,
-            valor_total: meta.valor,
+            data_processamento: meta.dhProc,
+            ambiente: meta.tpAmb,
+            // Prestador
+            prestador_cnpj: meta.prestadorCnpj,
+            prestador_razao: meta.prestadorRazao,
+            prestador_im: meta.prestadorIm,
+            // Tomador
+            tomador_tipo_documento: meta.tomadorTipoDoc,
+            tomador_documento: meta.tomadorDoc,
+            tomador_nome: meta.tomadorRazao,
+            tomador_email: meta.tomadorEmail,
+            // Serviço
+            codigo_servico: meta.cServ,
+            cnae: meta.cnae,
+            descricao_servico: meta.xDescServ,
+            municipio_codigo: meta.cMunIncid,
+            municipio_nome: meta.xMunIncid,
+            pais_codigo: meta.cPaisIncid,
+            // Valores
+            valor_servicos: meta.vServ,
+            valor_deducoes: meta.vDeducoes,
+            base_calculo: meta.vBC,
+            aliquota: meta.pAliq,
+            valor_iss: meta.vISSQN,
+            valor_total: meta.vLiq,
+            // Status
+            cancelada: meta.cancelada,
+            // Conteúdo
             xml_base64: bytesToB64(xmlBytes),
             pdf_base64: pdfB64,
           },
