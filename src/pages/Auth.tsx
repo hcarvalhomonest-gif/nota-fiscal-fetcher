@@ -57,8 +57,8 @@ const Auth = () => {
     }
     setLoading(true);
     const { error } = await supabase.auth.signUp({
-      email: parsed.data.email,
-      password: parsed.data.password,
+      email: parsed.data.email!,
+      password: parsed.data.password!,
       options: {
         emailRedirectTo: `${window.location.origin}/app`,
         data: { full_name: parsed.data.fullName },
