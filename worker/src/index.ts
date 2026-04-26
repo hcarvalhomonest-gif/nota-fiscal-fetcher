@@ -35,6 +35,13 @@ import "dotenv/config";
 import { gunzipSync } from "node:zlib";
 import { Agent, fetch as undiciFetch } from "undici";
 import forge from "node-forge";
+import { ZodError } from "zod";
+import {
+  loteDFeResponseSchema,
+  type LoteDFeItem,
+  type LoteDFeResponse,
+} from "./nfse-schema.js";
+import { parseNfseXml } from "./nfse-parse.js";
 
 const {
   SUPABASE_FUNCTIONS_URL,
@@ -80,16 +87,7 @@ interface ParsedPfx {
   caPems: string[];
 }
 
-interface LoteDFeItem {
-  NSU: number;
-  ChaveAcesso: string;
-  DataHoraGeracao: string;
-  ArquivoXml: string; // base64(gzip(xml))
-}
-
-interface LoteDFeResponse {
-  LoteDFe?: LoteDFeItem[];
-}
+// LoteDFeItem / LoteDFeResponse importados de ./nfse-schema (validados com zod)
 
 // ---------- Helpers ----------
 
@@ -178,41 +176,6 @@ function descompactarXml(arquivoXmlB64: string): { xmlText: string; xmlBytes: Ui
   const gzipped = Buffer.from(arquivoXmlB64, "base64");
   const xmlBuf = gunzipSync(gzipped);
   return { xmlText: xmlBuf.toString("utf8"), xmlBytes: new Uint8Array(xmlBuf) };
-}
-
-/** Extrai metadados básicos do XML da NFS-e (formato padrão nacional). */
-function parseNfseMeta(xmlText: string) {
-  const get = (tag: string) =>
-    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`).exec(xmlText)?.[1]?.trim() ?? null;
-
-  const numero = get("nNFSe") ?? get("NumeroNFSe") ?? get("Numero");
-  const serie = get("serie") ?? get("Serie");
-  const dhEmi = get("dhEmi") ?? get("DataEmissao");
-  const valor = get("vLiq") ?? get("vNF") ?? get("ValorLiquidoNfse") ?? get("ValorServicos");
-
-  // Tomador: o XML padrão nacional tem o bloco <toma>...</toma>; tentamos
-  // tanto o nome quanto o documento (CNPJ ou CPF) dentro desse bloco
-  const tomBlock =
-    /<toma>([\s\S]*?)<\/toma>/.exec(xmlText)?.[1] ??
-    /<Tomador>([\s\S]*?)<\/Tomador>/.exec(xmlText)?.[1] ??
-    "";
-  const tomNome =
-    /<xNome>([\s\S]*?)<\/xNome>/.exec(tomBlock)?.[1]?.trim() ??
-    /<RazaoSocial>([\s\S]*?)<\/RazaoSocial>/.exec(tomBlock)?.[1]?.trim() ??
-    null;
-  const tomDoc =
-    /<CNPJ>([\s\S]*?)<\/CNPJ>/.exec(tomBlock)?.[1]?.trim() ??
-    /<CPF>([\s\S]*?)<\/CPF>/.exec(tomBlock)?.[1]?.trim() ??
-    null;
-
-  return {
-    numero,
-    serie,
-    dhEmi,
-    valor: valor ? Number(valor.replace(",", ".")) : null,
-    tomNome,
-    tomDoc,
-  };
 }
 
 /** True se a data ISO `iso` cai dentro de [start, end] (datas YYYY-MM-DD inclusivas). */
