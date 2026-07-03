@@ -8,8 +8,10 @@ import { FileStack, FileText, FileCode, Archive, Loader2, FileSpreadsheet, Chevr
 
 type Invoice = {
   id: string; chave_acesso: string | null; numero: string | null; serie: string | null;
-  data_emissao: string | null; tomador_nome: string | null;
-  tomador_documento: string | null; valor_total: number | null;
+  data_emissao: string | null;
+  prestador_cnpj: string | null; prestador_razao: string | null;
+  tomador_nome: string | null; tomador_documento: string | null;
+  valor_total: number | null; valor_servicos: number | null;
   xml_path: string | null; pdf_path: string | null; job_id: string;
   created_at: string;
 };
