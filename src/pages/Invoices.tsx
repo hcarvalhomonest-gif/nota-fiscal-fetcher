@@ -123,24 +123,34 @@ const Invoices = () => {
     setXlsxing(key);
     try {
       const XLSX = await import("xlsx");
+      const fmtData = (iso: string | null) =>
+        iso ? new Date(iso).toLocaleDateString("pt-BR") : "";
+      const fmtDataHora = (iso: string | null) =>
+        iso ? new Date(iso).toLocaleString("pt-BR") : "";
+
       const rows = invs.map((i) => ({
-        "Número": i.numero ?? "",
-        "Série": i.serie ?? "",
-        "Chave de acesso": i.chave_acesso ?? "",
-        "Data emissão": i.data_emissao
-          ? new Date(i.data_emissao).toLocaleString("pt-BR")
-          : "",
-        "Tomador — Nome": i.tomador_nome ?? "",
-        "Tomador — Documento": i.tomador_documento ?? "",
-        "Valor total (R$)": i.valor_total ?? 0,
-        "XML": i.xml_path ?? "",
-        "PDF": i.pdf_path ?? "",
-        "Baixada em": new Date(i.created_at).toLocaleString("pt-BR"),
+        Numero: i.numero ?? "",
+        CnpjEmit: i.prestador_cnpj ?? "",
+        RzEmit: i.prestador_razao ?? "",
+        CnpjDest: i.tomador_documento ?? "",
+        RzDest: i.tomador_nome ?? "",
+        CnpjRem: "-",
+        CnpjTom: i.tomador_documento ?? "",
+        Valor: i.valor_total ?? i.valor_servicos ?? 0,
+        DtEmissao: fmtData(i.data_emissao),
+        DtDownload: fmtDataHora(i.created_at),
+        Chave: i.chave_acesso ?? "",
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
+      // Formata coluna "Valor" como moeda BR
+      const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+      for (let r = 1; r <= range.e.r; r++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c: 7 })]; // Valor = col H
+        if (cell && typeof cell.v === "number") cell.z = '#,##0.00';
+      }
       ws["!cols"] = [
-        { wch: 12 }, { wch: 8 }, { wch: 48 }, { wch: 20 },
-        { wch: 32 }, { wch: 20 }, { wch: 16 }, { wch: 40 }, { wch: 40 }, { wch: 20 },
+        { wch: 12 }, { wch: 18 }, { wch: 40 }, { wch: 18 }, { wch: 40 },
+        { wch: 10 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 20 }, { wch: 48 },
       ];
       const wb = XLSX.utils.book_new();
       // Nome de aba do Excel não pode conter : \ / ? * [ ] e tem limite de 31 chars
