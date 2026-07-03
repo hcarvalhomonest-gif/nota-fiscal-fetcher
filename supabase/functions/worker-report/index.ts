@@ -77,9 +77,12 @@ Deno.serve(async (req) => {
         numero: inv.numero ?? null,
         serie: inv.serie ?? null,
         data_emissao: inv.data_emissao ?? null,
+        prestador_cnpj: inv.prestador_cnpj ?? null,
+        prestador_razao: inv.prestador_razao ?? null,
         tomador_nome: inv.tomador_nome ?? null,
         tomador_documento: inv.tomador_documento ?? null,
-        valor_total: inv.valor_total ?? null,
+        valor_servicos: inv.valor_servicos ?? null,
+        valor_total: inv.valor_total ?? inv.valor_servicos ?? null,
         xml_path: xmlPath,
         pdf_path: pdfPath,
       });
