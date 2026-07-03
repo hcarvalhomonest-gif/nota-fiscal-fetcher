@@ -141,7 +141,9 @@ const Invoices = () => {
         { wch: 32 }, { wch: 20 }, { wch: 16 }, { wch: 40 }, { wch: 40 }, { wch: 20 },
       ];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, competenciaLabel(key).slice(0, 31));
+      // Nome de aba do Excel não pode conter : \ / ? * [ ] e tem limite de 31 chars
+      const sheetName = competenciaLabel(key).replace(/[:\\/?*[\]]/g, "-").slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
       XLSX.writeFile(wb, `notas-${key}.xlsx`);
     } catch (e) {
       toast({ title: "Erro", description: e instanceof Error ? e.message : "", variant: "destructive" });
