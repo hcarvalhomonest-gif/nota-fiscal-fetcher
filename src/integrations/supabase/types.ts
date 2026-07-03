@@ -173,9 +173,12 @@ export type Database = {
           numero: string | null
           owner_id: string
           pdf_path: string | null
+          prestador_cnpj: string | null
+          prestador_razao: string | null
           serie: string | null
           tomador_documento: string | null
           tomador_nome: string | null
+          valor_servicos: number | null
           valor_total: number | null
           xml_path: string | null
         }
@@ -188,9 +191,12 @@ export type Database = {
           numero?: string | null
           owner_id: string
           pdf_path?: string | null
+          prestador_cnpj?: string | null
+          prestador_razao?: string | null
           serie?: string | null
           tomador_documento?: string | null
           tomador_nome?: string | null
+          valor_servicos?: number | null
           valor_total?: number | null
           xml_path?: string | null
         }
@@ -203,9 +209,12 @@ export type Database = {
           numero?: string | null
           owner_id?: string
           pdf_path?: string | null
+          prestador_cnpj?: string | null
+          prestador_razao?: string | null
           serie?: string | null
           tomador_documento?: string | null
           tomador_nome?: string | null
+          valor_servicos?: number | null
           valor_total?: number | null
           xml_path?: string | null
         }
