@@ -52,7 +52,7 @@ const Books = () => {
       toast({ title: "Nenhuma nota nesse mês", description: "Faça o download do período antes de gerar o livro." });
       return;
     }
-    gerarLivroPdf({ tipo, empresa, competencia, notas });
+    await gerarLivroPdf({ tipo, empresa, competencia, notas });
   };
 
   return (
