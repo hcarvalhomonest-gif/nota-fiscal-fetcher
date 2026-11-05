@@ -66,6 +66,7 @@ Deno.serve(async (req) => {
       .order("created_at", { ascending: false }).limit(1);
     const procId = procs?.[0]?.id ?? null;
     let clientId: string | null = clientCerts?.[0]?.id ?? null;
+    let forcedProc: string | null = null;
     if (certificate_id) {
       const { data: c } = await supabase.from("certificates")
         .select("id, company_id, is_active, is_procurador").eq("id", certificate_id).maybeSingle();
@@ -74,15 +75,12 @@ Deno.serve(async (req) => {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (c.is_procurador) {
-        const primary = c.id;
-        const fallback = clientId;
-        return await insertJob(primary, fallback);
-      }
-      clientId = c.id;
+      if (c.is_procurador) forcedProc = c.id;
+      else clientId = c.id;
     }
-    const primaryId = procId ?? clientId;
-    const fallbackId = procId ? clientId : null;
+    const procChosen = forcedProc ?? procId;
+    const primaryId = procChosen ?? clientId;
+    const fallbackId = procChosen ? clientId : null;
     if (!primaryId) {
       return new Response(JSON.stringify({ error: "Nenhum certificado disponível (cadastre o certificado procurador da Monest ou o da empresa)" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

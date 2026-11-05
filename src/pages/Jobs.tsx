@@ -56,6 +56,7 @@ const Jobs = () => {
   }, []);
 
   const certsForCompany = certs.filter((c) => c.company_id === companyId);
+  const monestCerts = certs.filter((c) => c.is_procurador);
   const hasProcurador = certs.some((c) => c.is_procurador);
   const companyOf = (id: string) => companies.find((c) => c.id === id);
 
@@ -116,11 +117,14 @@ const Jobs = () => {
                 </Select>
               </div>
               <div>
-                <Label>Certificado</Label>
+                <Label>Certificado (a Monest representará a empresa escolhida acima)</Label>
                 <Select value={certId} onValueChange={setCertId} disabled={!companyId}>
                   <SelectTrigger><SelectValue placeholder={companyId ? "Selecione…" : "Escolha uma empresa antes"} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="auto">{hasProcurador ? "Automático (Monest procurador → cliente)" : "Automático (certificado do cliente)"}</SelectItem>
+                    {monestCerts.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>Monest (procurador): {c.subject_name || c.id.slice(0, 8)}</SelectItem>
+                    ))}
                     {certsForCompany.map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.subject_name || c.id.slice(0, 8)}</SelectItem>
                     ))}
