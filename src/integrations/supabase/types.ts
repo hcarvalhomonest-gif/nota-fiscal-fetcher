@@ -16,11 +16,12 @@ export type Database = {
     Tables: {
       certificates: {
         Row: {
-          company_id: string
+          company_id: string | null
           created_at: string
           expires_at: string | null
           id: string
           is_active: boolean
+          is_procurador: boolean
           owner_id: string
           password_encrypted: string
           password_iv: string
@@ -28,11 +29,12 @@ export type Database = {
           subject_name: string | null
         }
         Insert: {
-          company_id: string
+          company_id?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
+          is_procurador?: boolean
           owner_id: string
           password_encrypted: string
           password_iv: string
@@ -40,11 +42,12 @@ export type Database = {
           subject_name?: string | null
         }
         Update: {
-          company_id?: string
+          company_id?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
+          is_procurador?: boolean
           owner_id?: string
           password_encrypted?: string
           password_iv?: string
@@ -104,6 +107,7 @@ export type Database = {
           created_at: string
           downloaded_invoices: number
           error_message: string | null
+          fallback_certificate_id: string | null
           finished_at: string | null
           id: string
           owner_id: string
@@ -120,6 +124,7 @@ export type Database = {
           created_at?: string
           downloaded_invoices?: number
           error_message?: string | null
+          fallback_certificate_id?: string | null
           finished_at?: string | null
           id?: string
           owner_id: string
@@ -136,6 +141,7 @@ export type Database = {
           created_at?: string
           downloaded_invoices?: number
           error_message?: string | null
+          fallback_certificate_id?: string | null
           finished_at?: string | null
           id?: string
           owner_id?: string
@@ -161,6 +167,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "download_jobs_fallback_certificate_id_fkey"
+            columns: ["fallback_certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
         ]
       }
       invoices: {
@@ -176,6 +189,7 @@ export type Database = {
           prestador_cnpj: string | null
           prestador_razao: string | null
           serie: string | null
+          tipo: string
           tomador_documento: string | null
           tomador_nome: string | null
           valor_servicos: number | null
@@ -194,6 +208,7 @@ export type Database = {
           prestador_cnpj?: string | null
           prestador_razao?: string | null
           serie?: string | null
+          tipo?: string
           tomador_documento?: string | null
           tomador_nome?: string | null
           valor_servicos?: number | null
@@ -212,6 +227,7 @@ export type Database = {
           prestador_cnpj?: string | null
           prestador_razao?: string | null
           serie?: string | null
+          tipo?: string
           tomador_documento?: string | null
           tomador_nome?: string | null
           valor_servicos?: number | null
