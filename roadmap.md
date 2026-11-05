@@ -8,4 +8,5 @@
 - [ ] Implementar envio, assinatura, parâmetros municipais e consulta oficial: documentação detalhada da API retornou 403; requisitos atuais de assinatura procurador ainda não confirmados.
 - [x] Preparar diagnóstico isolado na VPS usando certificados cadastrados, seleção empresa/certificado, assinatura local não-DPS e bloqueios testados; documentar regras oficiais atuais de procuração.
 - [ ] Executar diagnóstico com certificados Monest reais na VPS e conferir procuração de cada empresa: depende da execução pelo responsável e comprovação oficial de assinatura procurador.
+- [ ] Obter contrato SEFIN a partir da VPS com diagnóstico somente de leitura e identificar verificações oficiais de habilitação/procuração sem envio fiscal.
 - [ ] Liberar emissão real e XML/PDF: depende do contrato oficial validado, autorização da empresa, integração na VPS e primeira emissão expressamente autorizada com dados fiscais reais.
