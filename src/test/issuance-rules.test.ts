@@ -36,4 +36,9 @@ describe('Confirmação e resultado incerto', () => {
     expect(validateIssuanceData({})).toEqual([]);
     expect(validateIssuanceData({}, true).length).toBeGreaterThan(0);
   });
+  it('recusa datas inexistentes sem lançar exceção', () => {
+    expect(validateIssuanceData({ competence: '2026-99-99' })).toHaveLength(1);
+    expect(validateIssuanceData({ competence: '2026-02-30' })).toHaveLength(1);
+    expect(validateIssuanceData({ competence: '2026-11-05' })).toEqual([]);
+  });
 });

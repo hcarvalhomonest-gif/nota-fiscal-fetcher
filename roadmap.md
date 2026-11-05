@@ -4,4 +4,6 @@
 - [x] Manter meses fechados até clicar; regras cobertas por testes.
 - [ ] Atualizar o worker na VPS e verificar um download real: depende da atualização feita pelo usuário.
 - [ ] Verificar telas com notas/certificados reais: conta disponível para teste não possui esses dados.
-- [ ] Criar área de emissão nacional por empresa com certificados Monest: definir fluxo seguro e validar autorização oficial antes de emissão real.
+- [x] Criar área Emitir NFS-e, configuração fiscal, rascunhos salvos, edição, histórico e revisão; verificar com sessão autenticada em computador e celular.
+- [ ] Implementar envio, assinatura, parâmetros municipais e consulta oficial: documentação detalhada da API retornou 403; requisitos atuais de assinatura procurador ainda não confirmados.
+- [ ] Liberar emissão real e XML/PDF: depende do contrato oficial validado, autorização da empresa, integração na VPS e primeira emissão expressamente autorizada com dados fiscais reais.

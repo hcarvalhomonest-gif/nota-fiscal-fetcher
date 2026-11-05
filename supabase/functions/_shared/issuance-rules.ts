@@ -6,7 +6,7 @@ export function certificateCanIssue(cert: IssuanceCertificate, companyId: string
     && (!cert.expires_at || Date.parse(cert.expires_at) > now);
 }
 
-export function canEditIssuance(status: IssuanceStatus) {
+export function canEditIssuance(status: string) {
   return status === 'draft' || status === 'rejected';
 }
 
