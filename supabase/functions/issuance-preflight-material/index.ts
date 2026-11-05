@@ -2,8 +2,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { certificateCanIssue } from '../_shared/issuance-rules.ts';
+import { certificateLabel } from '../_shared/certificate-label.ts';
 
-const schema = z.object({ company_id: z.string().uuid(), certificate_id: z.string().uuid() }).strict();
+const schema = z.union([z.object({ action: z.literal('options') }).strict(), z.object({ company_id: z.string().uuid(), certificate_id: z.string().uuid() }).strict()]);
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
 });
@@ -22,6 +23,12 @@ Deno.serve(async req => {
     const passwordKey = Deno.env.get('CERT_PASSWORD_KEY');
     if (!url || !serviceKey || !passwordKey) return reply({ error: 'Serviço indisponível.' }, 503);
     const admin = createClient(url, serviceKey);
+    if ('action' in parsed.data) {
+      const { data: companies, error: companyError } = await admin.from('companies').select('id,owner_id,legal_name,cnpj').order('legal_name').limit(500);
+      const { data: certificates, error: certError } = await admin.from('certificates').select('id,owner_id,company_id,is_procurador,is_active,expires_at,subject_name,storage_path').eq('is_active', true).limit(500);
+      if (companyError || certError) return reply({ error: 'Opções indisponíveis.' }, 503);
+      return reply({ companies, certificates: certificates?.map(cert => ({ id: cert.id, owner_id: cert.owner_id, company_id: cert.company_id, is_procurador: cert.is_procurador, expires_at: cert.expires_at, label: certificateLabel(cert) })), production_ready: false });
+    }
     const { data: company, error: companyError } = await admin.from('companies').select('id,owner_id').eq('id', parsed.data.company_id).maybeSingle();
     const { data: cert, error: certError } = await admin.from('certificates').select('id,owner_id,company_id,is_procurador,is_active,expires_at,storage_path,password_encrypted,password_iv').eq('id', parsed.data.certificate_id).maybeSingle();
     if (companyError || certError || !company || !cert || company.owner_id !== cert.owner_id || !certificateCanIssue(cert, company.id)) return reply({ error: 'Empresa ou certificado indisponível.' }, 403);
