@@ -25,6 +25,7 @@ export type Database = {
           owner_id: string
           password_encrypted: string
           password_iv: string
+          represented_company_ids: string[]
           storage_path: string
           subject_name: string | null
         }
@@ -38,6 +39,7 @@ export type Database = {
           owner_id: string
           password_encrypted: string
           password_iv: string
+          represented_company_ids?: string[]
           storage_path: string
           subject_name?: string | null
         }
@@ -51,6 +53,7 @@ export type Database = {
           owner_id?: string
           password_encrypted?: string
           password_iv?: string
+          represented_company_ids?: string[]
           storage_path?: string
           subject_name?: string | null
         }
