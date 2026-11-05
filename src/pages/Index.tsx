@@ -12,7 +12,7 @@ const Index = () => {
             <div className="h-8 w-8 rounded-md bg-gradient-primary flex items-center justify-center font-display font-bold text-primary-foreground">
               N
             </div>
-            <span className="font-display font-bold">NotaSync</span>
+            <span className="font-display font-bold">Monest Notas</span>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/auth"><Button variant="ghost">Entrar</Button></Link>
@@ -33,7 +33,7 @@ const Index = () => {
             </h1>
             <p className="text-lg md:text-xl text-primary-foreground/80 max-w-2xl mb-8">
               Cadastre suas empresas, faça upload do certificado A1 com senha, escolha um período
-              e o NotaSync baixa todas as notas emitidas — sem clicar uma a uma.
+              e o Monest Notas baixa todas as notas emitidas — sem clicar uma a uma.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/auth">
@@ -101,7 +101,7 @@ const Index = () => {
       </section>
 
       <footer className="py-10 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} NotaSync · Não é afiliado ao gov.br
+        © {new Date().getFullYear()} Monest Notas · Não é afiliado ao gov.br
       </footer>
     </div>
   );
