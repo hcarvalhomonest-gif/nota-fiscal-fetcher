@@ -3,6 +3,7 @@
 // Body: { job_id, worker_token, action: 'add_invoice' | 'finish' | 'fail',
 //         invoice?: {...}, error_message?: string }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { classifyInvoice, matchesInvoiceType } from "../_shared/invoice-type.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,6 +46,13 @@ Deno.serve(async (req) => {
 
     if (action === "add_invoice") {
       const inv = body.invoice ?? {};
+      const { data: company } = await admin.from("companies").select("cnpj").eq("id", job.company_id).single();
+      const tipo = classifyInvoice(inv.prestador_cnpj, inv.tomador_documento, company?.cnpj ?? "");
+      if (!matchesInvoiceType(job.invoice_type ?? "ambas", tipo)) {
+        return new Response(JSON.stringify({ success: true, skipped: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const userFolder = `${job.owner_id}/${job.id}`;
 
       let xmlPath: string | null = null;
@@ -70,13 +78,9 @@ Deno.serve(async (req) => {
         pdfPath = path;
       }
 
-      const { data: company } = await admin.from("companies").select("cnpj").eq("id", job.company_id).single();
-      const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
-      const tipo = inv.prestador_cnpj && company && digits(inv.prestador_cnpj) !== digits(company.cnpj)
-        ? "tomada" : "emitida";
-
       const { error: insErr } = await admin.from("invoices").insert({
         tipo,
+        cancelada: typeof inv.cancelada === "boolean" ? inv.cancelada : null,
         job_id: job.id,
         owner_id: job.owner_id,
         chave_acesso: inv.chave_acesso ?? null,

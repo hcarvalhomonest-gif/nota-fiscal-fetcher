@@ -43,6 +43,7 @@ import {
   type LoteDFeResponse,
 } from "./nfse-schema.js";
 import { parseNfseXml } from "./nfse-parse.js";
+import { classifyInvoice, matchesInvoiceType } from "../../supabase/functions/_shared/invoice-type.js";
 
 const {
   SUPABASE_FUNCTIONS_URL,
@@ -70,6 +71,7 @@ interface JobPayload {
     owner_id: string;
     period_start: string; // YYYY-MM-DD
     period_end: string;   // YYYY-MM-DD
+    invoice_type?: "emitida" | "tomada" | "ambas";
   };
   company: {
     id: string;
@@ -299,6 +301,8 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
         if (!dentroDoPeriodo(dataRef, j.period_start, j.period_end)) {
           continue;
         }
+        const tipo = classifyInvoice(meta.prestadorCnpj, meta.tomadorDoc, company.cnpj);
+        if (!matchesInvoiceType(j.invoice_type ?? "ambas", tipo)) continue;
 
         // Baixar DANFSe (PDF). Se falhar, prossegue só com o XML.
         let pdfB64: string | null = null;

@@ -35,10 +35,11 @@ const Books = () => {
     const fim = new Date(Date.UTC(y, m, 1)).toISOString();
     const { data, error } = await supabase
       .from("invoices")
-      .select("numero, serie, data_emissao, chave_acesso, prestador_cnpj, prestador_razao, tomador_documento, tomador_nome, valor_servicos, valor_total, download_jobs!inner(company_id)")
+      .select("numero, serie, data_emissao, chave_acesso, prestador_cnpj, prestador_razao, tomador_documento, tomador_nome, valor_servicos, valor_total, cancelada, download_jobs!inner(company_id)")
       .eq("download_jobs.company_id", empresa.id)
       .eq("tipo", tipo)
       .gte("data_emissao", ini).lt("data_emissao", fim)
+      .order("created_at", { ascending: false })
       .limit(5000);
     setBusy(null);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
@@ -48,6 +49,9 @@ const Books = () => {
       const k = n.chave_acesso ?? `${n.numero}-${n.serie}`;
       if (vistos.has(k)) return false; vistos.add(k); return true;
     });
+    for (const n of notas) {
+      if (n.chave_acesso && data?.some((other) => other.chave_acesso === n.chave_acesso && other.cancelada === true)) n.cancelada = true;
+    }
     if (notas.length === 0) {
       toast({ title: "Nenhuma nota nesse mês", description: "Faça o download do período antes de gerar o livro." });
       return;

@@ -9,14 +9,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, FileDown, Loader2, Trash2 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { certificateLabel, type InvoiceType } from "@/lib/fiscal-rules";
 
 type Job = {
   id: string; status: string; period_start: string; period_end: string;
   total_invoices: number; downloaded_invoices: number; error_message: string | null;
-  company_id: string; created_at: string;
+  company_id: string; created_at: string; certificate_id: string; invoice_type: string;
 };
-type Company = { id: string; legal_name: string; trade_name: string | null };
-type Cert = { id: string; company_id: string | null; is_active: boolean; subject_name: string | null; is_procurador: boolean };
+type Company = { id: string; cnpj: string; legal_name: string; trade_name: string | null };
+type Cert = { id: string; company_id: string | null; is_active: boolean; subject_name: string | null; is_procurador: boolean; storage_path: string };
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "outline", processing: "secondary", completed: "default",
@@ -35,13 +37,14 @@ const Jobs = () => {
   const [loading, setLoading] = useState(false);
   const [companyId, setCompanyId] = useState("");
   const [certId, setCertId] = useState("auto");
+  const [invoiceType, setInvoiceType] = useState<InvoiceType>("emitida");
   const { toast } = useToast();
 
   const load = async () => {
     const [j, c, k] = await Promise.all([
       supabase.from("download_jobs").select("*").order("created_at", { ascending: false }),
-      supabase.from("companies").select("id, legal_name, trade_name"),
-      supabase.from("certificates").select("id, company_id, is_active, subject_name, is_procurador").eq("is_active", true),
+      supabase.from("companies").select("id, cnpj, legal_name, trade_name"),
+      supabase.from("certificates").select("id, company_id, is_active, subject_name, is_procurador, storage_path").eq("is_active", true).order("created_at", { ascending: false }),
     ]);
     setJobs(j.data ?? []);
     setCompanies(c.data ?? []);
@@ -59,6 +62,7 @@ const Jobs = () => {
   const monestCerts = certs.filter((c) => c.is_procurador);
   const hasProcurador = certs.some((c) => c.is_procurador);
   const companyOf = (id: string) => companies.find((c) => c.id === id);
+  const selectedCert = certId === "auto" ? monestCerts[0] ?? certsForCompany[0] : certs.find((c) => c.id === certId);
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -71,7 +75,7 @@ const Jobs = () => {
     }
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("create-job", {
-      body: { company_id: companyId, certificate_id: certId === "auto" ? null : certId, period_start, period_end },
+      body: { company_id: companyId, certificate_id: certId === "auto" ? null : certId, period_start, period_end, invoice_type: invoiceType },
     });
     setLoading(false);
     if (error || (data as { error?: string })?.error) {
@@ -96,7 +100,7 @@ const Jobs = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold mb-1">Downloads</h1>
-          <p className="text-muted-foreground">Cada job baixa todas as NFS-e emitidas no período.</p>
+          <p className="text-muted-foreground">Downloads de NFS-e por empresa e período.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -105,13 +109,22 @@ const Jobs = () => {
           <DialogContent>
             <DialogHeader><DialogTitle>Novo job de download</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-3">
+              <div className="space-y-1">
+                <Label>Notas para baixar</Label>
+                <Tabs value={invoiceType} onValueChange={(v) => setInvoiceType(v === "tomada" ? "tomada" : "emitida")}>
+                  <TabsList className="grid grid-cols-2 w-full">
+                    <TabsTrigger value="emitida">Emitidas</TabsTrigger>
+                    <TabsTrigger value="tomada">Tomadas</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
               <div>
                 <Label>Empresa</Label>
                 <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setCertId("auto"); }}>
                   <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
                   <SelectContent>
                     {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.trade_name || c.legal_name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{c.trade_name || c.legal_name} · {c.cnpj}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -121,15 +134,21 @@ const Jobs = () => {
                 <Select value={certId} onValueChange={setCertId} disabled={!companyId}>
                   <SelectTrigger><SelectValue placeholder={companyId ? "Selecione…" : "Escolha uma empresa antes"} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">{hasProcurador ? "Automático (Monest procurador → cliente)" : "Automático (certificado do cliente)"}</SelectItem>
+                    <SelectItem value="auto">Automático{selectedCert && certId === "auto" ? ` · ${certificateLabel(selectedCert)}` : hasProcurador ? " · Monest" : " · Cliente"}</SelectItem>
                     {monestCerts.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>Monest (procurador): {c.subject_name || c.id.slice(0, 8)}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{certificateLabel(c)} · Procurador</SelectItem>
                     ))}
                     {certsForCompany.map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.subject_name || c.id.slice(0, 8)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {companyId && selectedCert && (
+                  <div className="mt-2 border-l-2 border-primary pl-3 text-sm space-y-1">
+                    <p className="font-semibold text-primary">Certificado escolhido: {certificateLabel(selectedCert)}</p>
+                    <p className="text-muted-foreground">Empresa representada: {companyOf(companyId)?.legal_name} · CNPJ {companyOf(companyId)?.cnpj}</p>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>De</Label><Input name="period_start" type="date" required /></div>
@@ -167,7 +186,9 @@ const Jobs = () => {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-display font-semibold">{co ? (co.trade_name || co.legal_name) : "—"}</span>
                       <Badge variant={statusVariant[j.status]}>{statusLabel[j.status]}</Badge>
+                      <Badge variant="outline">{j.invoice_type === "emitida" ? "Emitidas" : j.invoice_type === "tomada" ? "Tomadas" : "Emitidas e tomadas"}</Badge>
                     </div>
+                    <p className="text-sm text-primary">Certificado: {certs.find((c) => c.id === j.certificate_id) ? certificateLabel(certs.find((c) => c.id === j.certificate_id) as Cert) : "Indisponível"}</p>
                     <div className="text-sm text-muted-foreground">
                       Período: {new Date(j.period_start).toLocaleDateString("pt-BR")} → {new Date(j.period_end).toLocaleDateString("pt-BR")}
                     </div>

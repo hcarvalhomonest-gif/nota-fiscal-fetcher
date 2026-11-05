@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { certificateLabel } from "@/lib/fiscal-rules";
 
 type Cert = {
   id: string; storage_path: string; subject_name: string | null;
@@ -123,7 +124,7 @@ const Certificates = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-display font-semibold flex items-center gap-2">
-                    {c.subject_name || "Monest"} <Badge>Procurador</Badge>
+                    {certificateLabel(c)} <Badge>Procurador</Badge>
                     {expired && <Badge variant="destructive">Expirado</Badge>}
                   </div>
                   <div className="text-sm text-muted-foreground">{c.storage_path.split("/").pop()}{fmtVal(c)}</div>

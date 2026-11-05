@@ -35,7 +35,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { company_id, certificate_id, period_start, period_end } = await req.json();
+    const { company_id, certificate_id, period_start, period_end, invoice_type = "ambas" } = await req.json();
+    if (!["emitida", "tomada", "ambas"].includes(invoice_type)) {
+      return new Response(JSON.stringify({ error: "Tipo de nota inválido" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Basic validation
     if (!company_id || !period_start || !period_end) {
@@ -96,6 +101,7 @@ Deno.serve(async (req) => {
         fallback_certificate_id: fallbackId,
         period_start,
         period_end,
+        invoice_type,
         status: "pending",
         worker_token: genToken(),
       })

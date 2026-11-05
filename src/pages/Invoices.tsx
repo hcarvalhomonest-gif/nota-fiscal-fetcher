@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { FileStack, FileText, FileCode, Archive, Loader2, FileSpreadsheet, ChevronDown, ChevronRight } from "lucide-react";
+import { isMonthOpen } from "@/lib/fiscal-rules";
 
 type Invoice = {
   id: string; chave_acesso: string | null; numero: string | null; serie: string | null;
@@ -68,7 +69,7 @@ const Invoices = () => {
     for (const inv of filtered) {
       const k = competenciaKey(inv);
       if (!map.has(k)) map.set(k, []);
-      map.get(k)!.push(inv);
+      map.get(k)?.push(inv);
     }
     // ordena chaves desc (mais recente primeiro); "sem-data" vai por último
     return Array.from(map.entries()).sort(([a], [b]) => {
@@ -79,7 +80,7 @@ const Invoices = () => {
   }, [filtered]);
 
   const toggleMonth = (k: string) =>
-    setOpenMonths((s) => ({ ...s, [k]: !(s[k] ?? true) }));
+    setOpenMonths((s) => ({ ...s, [k]: !isMonthOpen(s, k) }));
 
   const downloadOne = async (path: string) => {
     const { data, error } = await supabase.storage.from("invoices").download(path);
@@ -189,22 +190,24 @@ const Invoices = () => {
       ) : (
         <div className="space-y-4">
           {grupos.map(([key, invs]) => {
-            const open = openMonths[key] ?? true;
+            const open = isMonthOpen(openMonths, key);
             const total = invs.reduce((s, i) => s + (i.valor_total ?? 0), 0);
             return (
               <Card key={key} className="overflow-hidden">
                 <div className="p-4 flex items-center justify-between gap-3 bg-muted/30 flex-wrap">
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
+                    aria-expanded={open}
                     onClick={() => toggleMonth(key)}
-                    className="flex items-center gap-2 text-left"
+                    className="h-auto flex items-center gap-2 text-left whitespace-normal flex-wrap justify-start"
                   >
                     {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     <span className="font-semibold text-lg">{competenciaLabel(key)}</span>
                     <span className="text-sm text-muted-foreground">
                       · {invs.length} {invs.length === 1 ? "nota" : "notas"} · R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
-                  </button>
+                  </Button>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
