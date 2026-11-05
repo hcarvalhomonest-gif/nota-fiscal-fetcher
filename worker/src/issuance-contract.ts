@@ -5,6 +5,17 @@ export const RESTRICTED_DOCS = `${RESTRICTED_ORIGIN}/API/SefinNacional/docs/inde
 export type ReadReply = { status: number; body: string };
 export type ContractRead = (url: string) => Promise<ReadReply>;
 
+/** Categorical diagnostics only: never print returned HTML, tokens or certificate identity. */
+export function documentationPageKind(body: string) {
+  if (/403\s*-?\s*Forbidden|Access is denied|request rejected|access denied|request blocked/i.test(body)) return 'access_denied';
+  if (/404\s*-?\s*(?:File|Not Found)|resource.*(?:not found|removed)|cannot be found/i.test(body)) return 'not_found';
+  if (/certificate.*(?:required|invalid|revoked)|certificado.*(?:inv[aá]lido|exigido)/i.test(body)) return 'certificate_error';
+  if (/captcha|verify.*human|checking your browser/i.test(body)) return 'access_challenge';
+  if (/type\s*=\s*["']password|sign in|log in|login/i.test(body)) return 'login_page';
+  if (/swagger|openapi/i.test(body)) return 'documentation';
+  return 'unrecognized_response';
+}
+
 // Only documentation resources on the restricted official host; no fiscal routes or query strings.
 export function documentationUrl(candidate: string, base = RESTRICTED_DOCS): string | null {
   try {
@@ -45,14 +56,14 @@ export function contractCandidates(text: string, base: string): string[] {
 export async function obtainRestrictedContract(read: ContractRead) {
   const visited = new Set<string>();
   const queue = [RESTRICTED_DOCS];
-  const attempts: { resource: string; status: number; bytes: number; advertised_resources: number; embedded_config: boolean }[] = [];
+  const attempts: { resource: string; status: number; bytes: number; advertised_resources: number; embedded_config: boolean; page_kind: string; response_sha256: string }[] = [];
   while (queue.length && visited.size < 8) {
     const url = queue.shift();
     if (!url || visited.has(url)) continue;
     visited.add(url);
     const reply = await read(url);
     const candidates = reply.status === 200 ? contractCandidates(reply.body, url) : [];
-    attempts.push({ resource: new URL(url).pathname, status: reply.status, bytes: Buffer.byteLength(reply.body), advertised_resources: candidates.length, embedded_config: reply.body.includes('JSON.parse(') });
+    attempts.push({ resource: new URL(url).pathname, status: reply.status, bytes: Buffer.byteLength(reply.body), advertised_resources: candidates.length, embedded_config: reply.body.includes('JSON.parse('), page_kind: documentationPageKind(reply.body), response_sha256: createHash('sha256').update(reply.body).digest('hex') });
     if (reply.status !== 200) continue;
     try {
       const doc = JSON.parse(reply.body);

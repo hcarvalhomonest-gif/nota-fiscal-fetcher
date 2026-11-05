@@ -10,5 +10,6 @@
 - [x] Receber diagnóstico real da VPS com certificado/chave e assinatura local válidos; combinação selecionada não foi identificada no relatório enviado.
 - [x] Preparar obtenção somente de leitura do contrato SEFIN restrito na VPS, sem envio fiscal; testes de isolamento e bloqueios aprovados.
 - [x] Ajustar descoberta para configuração JSON embutida, propriedades entre aspas e contratos sem extensão; acesso 200 informado pela VPS ainda não comprova obtenção do contrato.
+- [x] Adicionar diagnóstico categórico da resposta HTTP 200 sem documentação, sem expor HTML ou credenciais; identificação real da página aguarda nova execução na VPS.
 - [ ] Executar obtenção do contrato na VPS e comprovar assinatura oficial, procuração e habilitação de cada empresa: aguarda relatório/contrato público da VPS e evidências oficiais individuais.
 - [ ] Liberar emissão real e XML/PDF: depende do contrato oficial validado, autorização da empresa, integração na VPS e primeira emissão expressamente autorizada com dados fiscais reais.
