@@ -78,6 +78,50 @@ Deno.serve(async (req) => {
         pdfPath = path;
       }
 
+      const row = {
+        tipo,
+        chave_acesso: inv.chave_acesso ?? null,
+        numero: inv.numero ?? null,
+        serie: inv.serie ?? null,
+        data_emissao: inv.data_emissao ?? null,
+        prestador_cnpj: inv.prestador_cnpj ?? null,
+        prestador_razao: inv.prestador_razao ?? null,
+        tomador_nome: inv.tomador_nome ?? null,
+        tomador_documento: inv.tomador_documento ?? null,
+        valor_servicos: inv.valor_servicos ?? null,
+        valor_total: inv.valor_total ?? inv.valor_servicos ?? null,
+        xml_path: xmlPath,
+        pdf_path: pdfPath,
+      };
+
+      // Mesma nota já baixada antes para esta empresa: atualiza em vez de duplicar.
+      // Nunca volta uma nota cancelada para ativa.
+      let existing: { id: string; cancelada: boolean | null }[] = [];
+      if (inv.chave_acesso) {
+        const { data: companyJobs } = await admin.from("download_jobs").select("id")
+          .eq("owner_id", job.owner_id).eq("company_id", job.company_id);
+        const ids = (companyJobs ?? []).map((r) => r.id);
+        if (ids.length) {
+          const { data } = await admin.from("invoices").select("id, cancelada")
+            .eq("owner_id", job.owner_id).eq("chave_acesso", inv.chave_acesso).in("job_id", ids);
+          existing = data ?? [];
+        }
+      }
+      if (existing.length) {
+        const wasCancelled = existing.some((e) => e.cancelada === true);
+        const cancelada = wasCancelled || inv.cancelada === true ? true
+          : typeof inv.cancelada === "boolean" ? inv.cancelada : existing[0].cancelada;
+        const { error: updErr } = await admin.from("invoices").update({ ...row, cancelada })
+          .in("id", existing.map((e) => e.id));
+        if (updErr) throw updErr;
+        await admin.from("download_jobs")
+          .update({ downloaded_invoices: (job.downloaded_invoices ?? 0) + 1 })
+          .eq("id", job.id);
+        return new Response(JSON.stringify({ success: true, updated: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { error: insErr } = await admin.from("invoices").insert({
         tipo,
         cancelada: typeof inv.cancelada === "boolean" ? inv.cancelada : null,
