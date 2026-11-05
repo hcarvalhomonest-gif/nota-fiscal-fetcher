@@ -253,6 +253,140 @@ export type Database = {
           },
         ]
       }
+      issuance_settings: {
+        Row: {
+          company_id: string
+          dps_series: string
+          municipal_registration: string | null
+          municipality_code: string
+          owner_id: string
+          simples_assessment: string | null
+          special_tax_regime: string
+          tax_regime: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          dps_series?: string
+          municipal_registration?: string | null
+          municipality_code: string
+          owner_id: string
+          simples_assessment?: string | null
+          special_tax_regime?: string
+          tax_regime: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          dps_series?: string
+          municipal_registration?: string | null
+          municipality_code?: string
+          owner_id?: string
+          simples_assessment?: string | null
+          special_tax_regime?: string
+          tax_regime?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issuance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nfse_issuances: {
+        Row: {
+          access_key: string | null
+          certificate_id: string | null
+          company_id: string
+          confirmed_at: string | null
+          created_at: string
+          dps_id: string | null
+          dps_number: number | null
+          environment: string
+          error_message: string | null
+          finished_at: string | null
+          fiscal_snapshot: Json | null
+          id: string
+          invoice_number: string | null
+          official_response: Json | null
+          owner_id: string
+          payload: Json
+          pdf_path: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          version: number
+          xml_path: string | null
+        }
+        Insert: {
+          access_key?: string | null
+          certificate_id?: string | null
+          company_id: string
+          confirmed_at?: string | null
+          created_at?: string
+          dps_id?: string | null
+          dps_number?: number | null
+          environment?: string
+          error_message?: string | null
+          finished_at?: string | null
+          fiscal_snapshot?: Json | null
+          id?: string
+          invoice_number?: string | null
+          official_response?: Json | null
+          owner_id: string
+          payload?: Json
+          pdf_path?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+          xml_path?: string | null
+        }
+        Update: {
+          access_key?: string | null
+          certificate_id?: string | null
+          company_id?: string
+          confirmed_at?: string | null
+          created_at?: string
+          dps_id?: string | null
+          dps_number?: number | null
+          environment?: string
+          error_message?: string | null
+          finished_at?: string | null
+          fiscal_snapshot?: Json | null
+          id?: string
+          invoice_number?: string | null
+          official_response?: Json | null
+          owner_id?: string
+          payload?: Json
+          pdf_path?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+          xml_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfse_issuances_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_issuances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

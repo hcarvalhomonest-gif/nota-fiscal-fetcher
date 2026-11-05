@@ -14,6 +14,7 @@ import Certificates from "./pages/Certificates.tsx";
 import Jobs from "./pages/Jobs.tsx";
 import Invoices from "./pages/Invoices.tsx";
 import Books from "./pages/Books.tsx";
+import IssueInvoices from "./pages/IssueInvoices.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="jobs" element={<Jobs />} />
               <Route path="notas" element={<Invoices />} />
               <Route path="livros" element={<Books />} />
+              <Route path="emitir" element={<IssueInvoices />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
