@@ -59,6 +59,7 @@ Deno.serve(async (req) => {
     const { data: procs } = await supabase
       .from("certificates").select("id")
       .eq("is_procurador", true).eq("is_active", true)
+      .contains("represented_company_ids", [company_id])
       .order("created_at", { ascending: false }).limit(1);
     const { data: clientCerts } = await supabase
       .from("certificates").select("id")

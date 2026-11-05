@@ -54,6 +54,8 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { password, file_base64, file_name, subject_name, expires_at } = body;
     const is_procurador = body.is_procurador === true;
+    const represented_company_ids: string[] = Array.isArray(body.represented_company_ids)
+      ? body.represented_company_ids.filter((x: unknown) => typeof x === "string").slice(0, 2000) : [];
     const company_id: string | null = is_procurador ? null : body.company_id;
 
     if ((!is_procurador && !company_id) || !password || !file_base64 || !file_name) {
@@ -103,6 +105,7 @@ Deno.serve(async (req) => {
       .insert({
         company_id,
         is_procurador,
+        represented_company_ids: is_procurador ? represented_company_ids : [],
         owner_id: user.id,
         storage_path: path,
         password_encrypted: ciphertext,
