@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { documentationUrl, obtainRestrictedContract, RESTRICTED_DOCS, RESTRICTED_ORIGIN } from './issuance-contract.js';
+import { documentationPageKind, documentationUrl, obtainRestrictedContract, RESTRICTED_DOCS, RESTRICTED_ORIGIN } from './issuance-contract.js';
 
 test('reject production, fiscal operations and credential forwarding destinations', () => {
   for (const url of ['https://sefin.nfse.gov.br/SefinNacional/docs/swagger.json', `${RESTRICTED_ORIGIN}/API/SefinNacional/nfse`, 'https://example.com/swagger.json', '../nfse', '/API/SefinNacional/docs/x.json?token=secret', 'https://user:password@sefin.producaorestrita.nfse.gov.br/API/SefinNacional/docs/x.json']) {
@@ -65,4 +65,17 @@ test('encoded configuration cannot bypass restricted documentation host', async 
   });
   assert.equal(calls, 1);
   assert.equal(result.report.contract_obtained, false);
+});
+test('HTTP 200 error page is classified without becoming authorization evidence or leaking HTML', async () => {
+  const result = await obtainRestrictedContract(async () => ({ status: 200, body: '<title>403 - Forbidden: Access is denied.</title><div>private-token-value</div>' }));
+  assert.equal(result.report.attempts[0]?.page_kind, 'access_denied');
+  assert.equal(result.report.contract_obtained, false);
+  assert.equal(result.report.company_authorization_verified, false);
+  assert.equal(JSON.stringify(result.report).includes('private-token-value'), false);
+});
+test('categorize intermediate pages without logging page text', () => {
+  assert.equal(documentationPageKind('<title>404 - File or directory not found.</title>'), 'not_found');
+  assert.equal(documentationPageKind('Checking your browser captcha'), 'access_challenge');
+  assert.equal(documentationPageKind('<input type="password">'), 'login_page');
+  assert.equal(documentationPageKind('Swagger UI'), 'documentation');
 });
