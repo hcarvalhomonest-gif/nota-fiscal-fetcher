@@ -1,6 +1,6 @@
 import monestIcon from "@/assets/monest-icon.png";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Building2, FileDown, KeyRound, LayoutDashboard, LogOut, FileStack, BookOpen } from "lucide-react";
+import { Building2, FileDown, KeyRound, LayoutDashboard, LogOut, FileStack, BookOpen, FilePlus2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/app/empresas", label: "Empresas", icon: Building2 },
   { to: "/app/certificados", label: "Certificados", icon: KeyRound },
   { to: "/app/jobs", label: "Downloads", icon: FileDown },
+  { to: "/app/emitir", label: "Emitir NFS-e", icon: FilePlus2 },
   { to: "/app/notas", label: "Notas baixadas", icon: FileStack },
   { to: "/app/livros", label: "Livros fiscais", icon: BookOpen },
 ];
