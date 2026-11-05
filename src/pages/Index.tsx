@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Building2, KeyRound, Download, ShieldCheck, Cpu, FileStack } from "lucide-react";
+import monestIcon from "@/assets/monest-icon.png";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -9,9 +10,7 @@ const Index = () => {
       <header className="border-b border-border/60 bg-background/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-gradient-primary flex items-center justify-center font-display font-bold text-primary-foreground">
-              N
-            </div>
+            <img src={monestIcon} alt="Monest" className="h-8 w-8 object-contain" />
             <span className="font-display font-bold">Monest Notas</span>
           </div>
           <div className="flex items-center gap-2">
@@ -21,23 +20,23 @@ const Index = () => {
         </div>
       </header>
 
-      <section className="bg-gradient-hero text-primary-foreground">
+      <section className="bg-gradient-hero text-foreground">
         <div className="max-w-6xl mx-auto px-6 py-24">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-foreground/10 text-xs font-medium tracking-wide uppercase mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tracking-wide uppercase mb-6">
               <ShieldCheck className="h-3.5 w-3.5" />
               Para o portal nacional NFS-e (gov.br)
             </div>
             <h1 className="font-display text-5xl md:text-6xl font-bold leading-[1.05] mb-6">
               Baixe XMLs e PDFs<br />de NFS-e em lote.
             </h1>
-            <p className="text-lg md:text-xl text-primary-foreground/80 max-w-2xl mb-8">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-8">
               Cadastre suas empresas, faça upload do certificado A1 com senha, escolha um período
               e o Monest Notas baixa todas as notas emitidas — sem clicar uma a uma.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/auth">
-                <Button size="lg" variant="secondary" className="gap-2">
+                <Button size="lg" className="gap-2">
                   Criar conta grátis <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

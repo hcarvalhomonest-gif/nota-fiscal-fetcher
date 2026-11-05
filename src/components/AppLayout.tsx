@@ -1,3 +1,4 @@
+import monestIcon from "@/assets/monest-icon.png";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Building2, FileDown, KeyRound, LayoutDashboard, LogOut, FileStack, BookOpen } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,9 +27,7 @@ export const AppLayout = () => {
       <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
         <div className="px-6 py-5 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center font-display font-black text-primary-foreground">
-              M
-            </div>
+            <img src={monestIcon} alt="Monest" className="h-8 w-8 object-contain" />
             <div>
               <div className="font-display font-extrabold leading-tight tracking-tight">monest <span className="text-sidebar-primary">notas</span></div>
               <div className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">NFS-e Nacional</div>
