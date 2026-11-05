@@ -107,6 +107,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "cancel_invoice") {
+      if (typeof body.chave_acesso !== "string" || !/^\d{50}$/.test(body.chave_acesso)) throw new Error("Invalid cancellation key");
+      const { data: companyJobs, error } = await admin.from("download_jobs").select("id")
+        .eq("owner_id", job.owner_id).eq("company_id", job.company_id);
+      if (error) throw error;
+      const ids = (companyJobs ?? []).map((row) => row.id);
+      if (ids.length) {
+        const { error: updateError } = await admin.from("invoices").update({ cancelada: true })
+          .eq("owner_id", job.owner_id).eq("chave_acesso", body.chave_acesso).in("job_id", ids);
+        if (updateError) throw updateError;
+      }
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "finish") {
       await admin.from("download_jobs").update({
         status: "completed",

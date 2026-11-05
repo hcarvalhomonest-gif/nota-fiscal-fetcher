@@ -42,7 +42,7 @@ import {
   type LoteDFeItem,
   type LoteDFeResponse,
 } from "./nfse-schema.js";
-import { parseNfseXml } from "./nfse-parse.js";
+import { parseNfseXml, parseCancellationEvent } from "./nfse-parse.js";
 import { classifyInvoice, matchesInvoiceType } from "../../supabase/functions/_shared/invoice-type.js";
 
 const {
@@ -215,9 +215,9 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
   let nsu = 0;
   let pageCount = 0;
   let totalReportadas = 0;
-  let passouDoPeriodo = false;
+  const cancelledKeys = new Set<string>();
 
-  while (pageCount < MAX_PAGES_N && !passouDoPeriodo) {
+  while (pageCount < MAX_PAGES_N) {
     const url = `${NFSE_BASE_URL}/contribuintes/dfe/${nsu}?cnpjConsulta=${cnpj}&lote=true`;
     console.log("[job", j.id, "] GET", url);
 
@@ -265,19 +265,13 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
 
     for (const item of lotes as LoteDFeItem[]) {
       try {
-        // Pular eventos (cancelamento/substituição vêm como itens próprios sem
-        // ChaveAcesso de NFS-e mas com tpEvento + chNFSe). Atualizamos a nota
-        // existente como cancelada via campo `cancelada` quando o XML for da
-        // própria NFS-e cancelada (ver parser).
-        if (item.tpEvento && !item.ChaveAcesso) {
-          console.log(
-            "[job", j.id, "] evento ignorado tpEvento=", item.tpEvento,
-            "chNFSe=", item.chNFSe, "NSU=", item.NSU,
-          );
+        const { xmlText, xmlBytes } = descompactarXml(item.ArquivoXml);
+        const cancellationKey = parseCancellationEvent(xmlText);
+        if (cancellationKey) {
+          cancelledKeys.add(cancellationKey);
           continue;
         }
-
-        const { xmlText, xmlBytes } = descompactarXml(item.ArquivoXml);
+        if (item.tpEvento && !item.ChaveAcesso) continue;
         const meta = parseNfseXml(xmlText);
 
         // Coerência: se o JSON traz ChaveAcesso, deve bater com a do XML
@@ -292,12 +286,7 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
         // Preferir a data do XML; cair para DataHoraGeracao do envelope
         const dataRef = meta.dhEmi ?? item.DataHoraGeracao ?? null;
 
-        // Otimização: o ADN entrega em ordem crescente de NSU (≈ ordem de
-        // geração). Se já passamos do fim do período, encerra paginação.
-        if (dataRef && dataRef.slice(0, 10) > j.period_end) {
-          passouDoPeriodo = true;
-          break;
-        }
+        // Percorrer eventos posteriores ao período para manter cancelamentos atualizados.
         if (!dentroDoPeriodo(dataRef, j.period_start, j.period_end)) {
           continue;
         }
@@ -384,6 +373,9 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
     await sleep(REQ_DELAY);
   }
 
+  for (const chave of cancelledKeys) {
+    await report({ job_id: j.id, worker_token: j.worker_token, action: "cancel_invoice", chave_acesso: chave });
+  }
   return totalReportadas;
 }
 

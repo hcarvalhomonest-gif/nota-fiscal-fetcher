@@ -119,6 +119,16 @@ function detectCancelado(root: unknown): boolean {
 
 // ---------- Parser principal ----------
 
+export function parseCancellationEvent(xmlText: string): string | null {
+  const tree = parser.parse(xmlText);
+  const event = pick(tree, "procEventoNFSe", "evento", "infEvento") ?? pick(tree, "evento", "infEvento");
+  if (!event) return null;
+  const type = asString(pick(event, "tpEvento"));
+  const cancelled = type === "101000" || Boolean(pick(event, "e101101")) || Boolean(pick(event, "e101103"));
+  const key = asString(pick(event, "chNFSe"));
+  return cancelled && key && /^\d{50}$/.test(key) ? key : null;
+}
+
 export function parseNfseXml(xmlText: string): NfseMapped {
   const tree = parser.parse(xmlText);
 
