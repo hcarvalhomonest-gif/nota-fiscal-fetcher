@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { inspectIssuanceCertificate } from './issuance-preflight.js';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
+import { Agent, fetch as mtlsFetch } from 'undici';
+import { obtainRestrictedContract } from './issuance-contract.js';
+import { writeFile } from 'node:fs/promises';
 
 async function main() {
   const configuration = z.object({
@@ -53,6 +56,33 @@ async function main() {
   const result = inspectIssuanceCertificate(parsed.pfx_base64, parsed.password);
   console.log(JSON.stringify(result, null, 2));
   if (!result.local_signature_valid) process.exitCode = 1;
+  if (process.argv.includes('--official-contract') && result.local_signature_valid) {
+    // Read-only restricted documentation. No production request or DPS submission exists here.
+    const agent = new Agent({ connect: { pfx: Buffer.from(parsed.pfx_base64, 'base64'), passphrase: parsed.password, rejectUnauthorized: true } });
+    try {
+      const contract = await obtainRestrictedContract(async url => {
+        const response = await mtlsFetch(url, { method: 'GET', redirect: 'manual', dispatcher: agent, signal: AbortSignal.timeout(20000) });
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        for await (const chunk of response.body ?? []) {
+          size += chunk.length;
+          if (size > 5000000) throw new Error('documentation too large');
+          chunks.push(chunk);
+        }
+        return { status: response.status, body: Buffer.concat(chunks).toString('utf8') };
+      });
+      console.log(JSON.stringify(contract.report, null, 2));
+      if (contract.contract) {
+        // Fixed temporary destination, exclusive creation avoids overwriting/following symlinks.
+        const path = `/tmp/monest-sefin-restrita-${Date.now()}.json`;
+        await writeFile(path, contract.contract, { mode: 0o600, flag: 'wx' });
+        console.log(`Contrato público salvo em ${path}. Nenhum certificado ou senha foi salvo.`);
+      } else {
+        console.log('Contrato não obtido. Nenhuma assinatura fiscal ou autorização foi validada.');
+        process.exitCode = 1;
+      }
+    } finally { await agent.close(); }
+  }
 }
 
 main().catch(() => {

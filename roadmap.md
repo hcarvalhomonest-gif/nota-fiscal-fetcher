@@ -7,5 +7,7 @@
 - [x] Criar área Emitir NFS-e, configuração fiscal, rascunhos salvos, edição, histórico e revisão; verificar com sessão autenticada em computador e celular.
 - [ ] Implementar envio, assinatura, parâmetros municipais e consulta oficial: documentação detalhada da API retornou 403; requisitos atuais de assinatura procurador ainda não confirmados.
 - [x] Preparar diagnóstico isolado na VPS usando certificados cadastrados, seleção empresa/certificado, assinatura local não-DPS e bloqueios testados; documentar regras oficiais atuais de procuração.
-- [ ] Executar diagnóstico com certificados Monest reais na VPS e conferir procuração de cada empresa: depende da execução pelo responsável e comprovação oficial de assinatura procurador.
+- [x] Receber diagnóstico real da VPS com certificado/chave e assinatura local válidos; combinação selecionada não foi identificada no relatório enviado.
+- [x] Preparar obtenção somente de leitura do contrato SEFIN restrito na VPS, sem envio fiscal; testes de isolamento e bloqueios aprovados.
+- [ ] Executar obtenção do contrato na VPS e comprovar assinatura oficial, procuração e habilitação de cada empresa: aguarda relatório/contrato público da VPS e evidências oficiais individuais.
 - [ ] Liberar emissão real e XML/PDF: depende do contrato oficial validado, autorização da empresa, integração na VPS e primeira emissão expressamente autorizada com dados fiscais reais.

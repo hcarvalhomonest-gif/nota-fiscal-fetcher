@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "issuance:preflight": "tsx src/issuance-preflight-cli.ts",
-    "test:issuance": "tsx --test src/issuance-preflight.test.ts",
+    "issuance:contract": "tsx src/issuance-preflight-cli.ts --official-contract",
+    "test:issuance": "tsx --test src/issuance-preflight.test.ts src/issuance-contract.test.ts",
     "build": "tsc"
   },
   "dependencies": {

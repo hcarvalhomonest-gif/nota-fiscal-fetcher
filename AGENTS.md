@@ -4,3 +4,4 @@
 - `worker-report` updates an existing invoice with the same access key for the company instead of inserting, so re-downloading a month can backfill cancellations without duplicates.
 - Issuance uses separate resources and server-only writes; production remains fail-closed until the official signature, durable DPS allocation and reconciliation adapter have been validated, because an uncertain fiscal submission must never be retried blindly.
 - Issuance certificate preflight is a separate read-only worker command with an offline non-DPS signature probe; it never establishes company authorization or changes issuance state, because local cryptography cannot prove fiscal permission.
+- Official contract discovery permits GET only to restricted SEFIN documentation on a fixed host, rejects redirects and external links, and never executes advertised fiscal paths; obtaining a contract is not authorization evidence.

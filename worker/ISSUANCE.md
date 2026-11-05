@@ -35,6 +35,31 @@ Escolha a empresa e depois Monest nova ou Monest antiga HC pelo número mostrado
 
 ## Evidência de representação atualizada
 
+## Próxima etapa: obter o contrato oficial na VPS
+
+O teste local informado pelo responsável passou em 05/11/2026 para a combinação selecionada. Isso não identifica quais combinações restantes foram testadas nem comprova autorização fiscal.
+
+Foi adicionado `issuance:contract`, que tenta obter a documentação oficial do SEFIN restrito com o certificado escolhido. Faz somente GET na documentação do host oficial restrito, com validação TLS, sem seguir redirecionamentos, executar scripts ou chamar as operações fiscais anunciadas. Procura o contrato apenas em links anunciados pela própria documentação; não adivinha endpoints. O contrato obtido recebe hash SHA-256 e é salvo em arquivo temporário com permissão 0600. Nenhuma chave ou senha é salva. Não envia DPS, nem sequer de teste.
+
+```bash
+cd /opt/notasync
+git pull --ff-only
+cd worker
+npm install --include=dev
+npm run test:issuance
+npm run issuance:contract
+```
+
+Selecione a empresa e o certificado. Envie somente o relatório final. Se `contract_obtained: true`, envie também o JSON público salvo em `/tmp/monest-sefin-restrita-<horario>.json`, após conferir que contém apenas a especificação pública. Não envie `.env`, PFX, senhas ou qualquer registro de autenticação. Se houver 403 ou erro TLS, a tentativa não comprovou autorização; não desabilitar TLS ou liberar envio para contornar.
+
+Mesmo com contrato obtido, os indicadores de assinatura oficial e autorização permanecem falsos: obter documentação não valida procuração, habilitação ou aceitação de assinatura. O teste sem certificado no ambiente de desenvolvimento retornou 403 em 05/11/2026; o acesso com os certificados reais depende da execução na VPS, à qual este projeto não tem acesso remoto.
+
+### Conferência individual de procuração e habilitação
+
+Para cada CNPJ e cada certificado Monest, guardar evidência da autorização NFS-e no portal de serviços da Receita: outorgante, procurador exato, serviço autorizado e vigência. Confirmar separadamente a habilitação da empresa no Emissor Nacional e os parâmetros municipais vigentes. A conferência manual é evidência para revisão, não verificação automática nem motivo para remover o bloqueio. Não usar sucesso no download ou acesso ao Swagger como prova de emissão.
+
+O manual documenta GET `/parametros_municipais/{codigoMunicipio}/convenio`; o convênio é municipal e não comprova habilitação da empresa. As demais rotas/exemplos incompletos ainda dependem do contrato atual. Não foi confirmado endpoint independente para comprovar procuração de emissão. Sem contrato e essa comprovação, a validação de assinatura procurador permanece pendente. Uma emissão em produção restrita também deverá ter autorização expressa para o teste e nunca será disparada por este diagnóstico.
+
 A notícia oficial correta é https://www.gov.br/nfse/pt-br/noticias/nova-funcionalidade-possibilita-representacao-e-alternancia-de-perfis-na-nfs-e . A representação passou a abranger APIs de emissão e distribuição em novembro de 2026. Isso não esclarece por si só a regra E0718 do Anexo I 1.01 (linha 649), que exige certificado do emitente da DPS. O Swagger restrito continua retornando 403 nesta investigação. Assinatura procurador permanece pendente de contrato atual e validação no ambiente restrito.
 
 - Anexo I: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/documentacao-atual/anexo_i-sefin_adn-dps_nfse-snnfse-v1-01-20260209.xlsx
