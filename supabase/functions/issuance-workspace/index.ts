@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
-import { canEditIssuance, certificateCanIssue, confirmationBlockers, validateIssuanceData } from '../_shared/issuance-rules.ts';
+import { ISSUANCE_PRODUCTION_READY, canEditIssuance, certificateCanIssue, confirmationBlockers, validateIssuanceData } from '../_shared/issuance-rules.ts';
 
 const dataSchema = z.object({
   competence: z.string().max(10).optional(), customer_document: z.string().max(18).optional(),
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const input = parsed.data;
     // Deliberately fail closed. Production must not be enabled merely by setting an environment variable.
     // Replace only after a verified official adapter, durable DPS allocation and reconciliation are deployed.
-    const integrationVerified = false;
+    const integrationVerified = ISSUANCE_PRODUCTION_READY;
     if (input.action === 'capabilities') return response({ production_ready: integrationVerified, blockers: ['Assinatura e leiaute oficial precisam ser validados.', 'Programa da VPS ainda não possui emissão validada.', 'Habilitação e procuração para emissão precisam ser conferidas para cada empresa.'] });
     const admin = createClient(url, service);
     if (input.action === 'save_settings' || input.action === 'save_draft') {

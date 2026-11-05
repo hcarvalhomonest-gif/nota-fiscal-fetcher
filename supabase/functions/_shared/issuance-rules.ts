@@ -1,6 +1,8 @@
 export type IssuanceStatus = 'draft' | 'queued' | 'processing' | 'authorized' | 'rejected' | 'uncertain';
 export type IssuanceCertificate = { id: string; company_id: string | null; is_procurador: boolean; is_active: boolean; expires_at: string | null };
 
+export const ISSUANCE_PRODUCTION_READY = false;
+
 export function certificateCanIssue(cert: IssuanceCertificate, companyId: string, now = Date.now()) {
   return cert.is_active && (cert.is_procurador || cert.company_id === companyId)
     && (!cert.expires_at || Date.parse(cert.expires_at) > now);
@@ -13,6 +15,7 @@ export function canEditIssuance(status: string) {
 export function confirmationBlockers(input: {
   status: IssuanceStatus; confirmed: boolean; certificateEligible: boolean;
   fiscalConfigured: boolean; integrationVerified: boolean;
+  officialSignatureVerified?: boolean; companyAuthorizationVerified?: boolean;
 }) {
   const blockers: string[] = [];
   if (!canEditIssuance(input.status)) blockers.push('Esta solicitação já foi enviada ou aguarda consulta do resultado.');
@@ -20,6 +23,8 @@ export function confirmationBlockers(input: {
   if (!input.certificateEligible) blockers.push('Escolha um certificado ativo, válido e acessível para esta empresa.');
   if (!input.fiscalConfigured) blockers.push('Complete a configuração fiscal da empresa.');
   if (!input.integrationVerified) blockers.push('Emissão real bloqueada: assinatura, autorização e processamento na VPS ainda não foram validados.');
+  if (!input.officialSignatureVerified) blockers.push('Assinatura fiscal oficial não validada para este certificado.');
+  if (!input.companyAuthorizationVerified) blockers.push('Procuração e habilitação para emissão não verificadas para esta empresa.');
   return blockers;
 }
 

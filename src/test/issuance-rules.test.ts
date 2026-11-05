@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { certificateCanIssue, confirmationBlockers, canEditIssuance, validateIssuanceData } from '../../supabase/functions/_shared/issuance-rules';
+import { ISSUANCE_PRODUCTION_READY, certificateCanIssue, confirmationBlockers, canEditIssuance, validateIssuanceData } from '../../supabase/functions/_shared/issuance-rules';
 
 describe('Emissão por empresa e certificado Monest', () => {
   const monest = { id: 'monest', company_id: null, is_procurador: true, is_active: true, expires_at: null };
@@ -16,7 +16,16 @@ describe('Emissão por empresa e certificado Monest', () => {
 });
 
 describe('Confirmação e resultado incerto', () => {
-  const ready = { status: 'draft' as const, confirmed: true, certificateEligible: true, fiscalConfigured: true, integrationVerified: true };
+  const ready = { status: 'draft' as const, confirmed: true, certificateEligible: true, fiscalConfigured: true, integrationVerified: true, officialSignatureVerified: true, companyAuthorizationVerified: true };
+  it('mantém envio real desligado mesmo após diagnóstico local', () => {
+    expect(ISSUANCE_PRODUCTION_READY).toBe(false);
+  });
+  it('exige procuração de cada empresa separadamente', () => {
+    expect(confirmationBlockers({ ...ready, companyAuthorizationVerified: false })).toHaveLength(1);
+  });
+  it('assinatura local não substitui validação fiscal oficial', () => {
+    expect(confirmationBlockers({ ...ready, officialSignatureVerified: false })).toHaveLength(1);
+  });
   it('exige confirmação antes da emissão real', () => {
     expect(confirmationBlockers({ ...ready, confirmed: false })).toHaveLength(1);
     expect(confirmationBlockers(ready)).toHaveLength(0);
