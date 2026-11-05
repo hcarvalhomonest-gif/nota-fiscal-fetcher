@@ -1,0 +1,3 @@
+- Shared fiscal rules identify certificates without displaying filenames, because filenames can contain credentials.
+- Download type is persisted per job and enforced in both worker and report endpoint, so mixed ADN batches cannot mix user-selected types.
+- Invoice cancellation is nullable: unknown historical status must never be displayed as active.

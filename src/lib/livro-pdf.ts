@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import monestIcon from "@/assets/monest-icon.png";
+import { invoiceStatus } from "./fiscal-rules";
 
 const INK: [number, number, number] = [15, 20, 36];
 const VOLT: [number, number, number] = [190, 242, 60];
@@ -17,6 +18,7 @@ export type LivroInvoice = {
   prestador_cnpj: string | null; prestador_razao: string | null;
   tomador_documento: string | null; tomador_nome: string | null;
   valor_servicos: number | null; valor_total: number | null;
+  cancelada: boolean | null;
 };
 
 export type LivroTipo = "emitida" | "tomada";
@@ -54,7 +56,7 @@ export async function gerarLivroPdf(opts: {
       String(i + 1),
       n.data_emissao ? new Date(n.data_emissao).toLocaleDateString("pt-BR") : "",
       n.numero ?? "", n.serie ?? "", fmtDoc(cDoc), cNome ?? "",
-      n.chave_acesso ? n.chave_acesso.slice(-14) : "", brl(v),
+      n.chave_acesso ? n.chave_acesso.slice(-14) : "", invoiceStatus(n.cancelada), brl(v),
     ];
   });
 
@@ -85,20 +87,22 @@ export async function gerarLivroPdf(opts: {
   };
   box(12, "Quantidade de notas", String(ordenadas.length));
   box(86, "Valor total", brl(total));
-  box(160, "Competência", `${m}/${y}`);
+  box(160, "Situação das notas", `${notas.filter((n) => n.cancelada === false).length} ativas · ${notas.filter((n) => n.cancelada === true).length} canceladas`);
+  doc.setFontSize(8);
+  doc.text(`Situação não informada: ${notas.filter((n) => n.cancelada == null).length} · Valor total inclui todas as notas listadas.`, 12, 57);
 
   autoTable(doc, {
-    startY: 59,
+    startY: 62,
     margin: { top: 37, left: 12, right: 12, bottom: 16 },
-    head: [["#", "Emissão", "Número", "Série", tipo === "emitida" ? "CPF/CNPJ Tomador" : "CNPJ Prestador", tipo === "emitida" ? "Tomador" : "Prestador", "Chave (final)", "Valor"]],
+    head: [["#", "Emissão", "Número", "Série", tipo === "emitida" ? "CPF/CNPJ Tomador" : "CNPJ Prestador", tipo === "emitida" ? "Tomador" : "Prestador", "Chave (final)", "Situação", "Valor"]],
     body,
     showFoot: "lastPage",
-    foot: [["", "", "", "", "", `Total — ${ordenadas.length} notas`, "", brl(total)]],
+    foot: [["", "", "", "", "", `Total — ${ordenadas.length} notas`, "", "", brl(total)]],
     styles: { fontSize: 8, cellPadding: 1.8, textColor: INK, lineColor: [225, 228, 235], lineWidth: 0.1 },
     headStyles: { fillColor: INK, textColor: VOLT, fontStyle: "bold" },
     footStyles: { fillColor: VOLT, textColor: INK, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [247, 248, 251] },
-    columnStyles: { 0: { cellWidth: 10 }, 7: { halign: "right", cellWidth: 30 } },
+    columnStyles: { 0: { cellWidth: 10 }, 7: { cellWidth: 26 }, 8: { halign: "right", cellWidth: 30 } },
     didDrawPage: () => {
       if (doc.getNumberOfPages() > 1) header();
       doc.setFontSize(7.5); doc.setTextColor(120, 128, 145); doc.setFont("helvetica", "normal");

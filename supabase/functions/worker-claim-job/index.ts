@@ -91,6 +91,7 @@ Deno.serve(async (req) => {
         owner_id: job.owner_id,
         period_start: job.period_start,
         period_end: job.period_end,
+        invoice_type: job.invoice_type,
       },
       company,
       certificate,

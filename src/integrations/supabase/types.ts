@@ -113,6 +113,7 @@ export type Database = {
           fallback_certificate_id: string | null
           finished_at: string | null
           id: string
+          invoice_type: string
           owner_id: string
           period_end: string
           period_start: string
@@ -130,6 +131,7 @@ export type Database = {
           fallback_certificate_id?: string | null
           finished_at?: string | null
           id?: string
+          invoice_type?: string
           owner_id: string
           period_end: string
           period_start: string
@@ -147,6 +149,7 @@ export type Database = {
           fallback_certificate_id?: string | null
           finished_at?: string | null
           id?: string
+          invoice_type?: string
           owner_id?: string
           period_end?: string
           period_start?: string
@@ -181,6 +184,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          cancelada: boolean | null
           chave_acesso: string | null
           created_at: string
           data_emissao: string | null
@@ -200,6 +204,7 @@ export type Database = {
           xml_path: string | null
         }
         Insert: {
+          cancelada?: boolean | null
           chave_acesso?: string | null
           created_at?: string
           data_emissao?: string | null
@@ -219,6 +224,7 @@ export type Database = {
           xml_path?: string | null
         }
         Update: {
+          cancelada?: boolean | null
           chave_acesso?: string | null
           created_at?: string
           data_emissao?: string | null

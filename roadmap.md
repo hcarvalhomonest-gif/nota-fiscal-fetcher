@@ -1,0 +1,6 @@
+- [x] Identificar certificado Monest nova / antiga HC no download.
+- [x] Escolher notas emitidas ou tomadas e aplicar a escolha no processamento.
+- [x] Mostrar situação ativa/cancelada nos livros fiscais, sem presumir situação de dados antigos.
+- [x] Manter meses fechados até clicar; regras cobertas por testes.
+- [ ] Atualizar o worker na VPS e verificar um download real: depende da atualização feita pelo usuário.
+- [ ] Verificar telas com notas/certificados reais: conta disponível para teste não possui esses dados.
