@@ -92,6 +92,7 @@ export async function gerarLivroPdf(opts: {
     margin: { top: 37, left: 12, right: 12, bottom: 16 },
     head: [["#", "Emissão", "Número", "Série", tipo === "emitida" ? "CPF/CNPJ Tomador" : "CNPJ Prestador", tipo === "emitida" ? "Tomador" : "Prestador", "Chave (final)", "Valor"]],
     body,
+    showFoot: "lastPage",
     foot: [["", "", "", "", "", `Total — ${ordenadas.length} notas`, "", brl(total)]],
     styles: { fontSize: 8, cellPadding: 1.8, textColor: INK, lineColor: [225, 228, 235], lineWidth: 0.1 },
     headStyles: { fillColor: INK, textColor: VOLT, fontStyle: "bold" },
