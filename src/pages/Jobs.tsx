@@ -16,7 +16,7 @@ type Job = {
   company_id: string; created_at: string;
 };
 type Company = { id: string; legal_name: string; trade_name: string | null };
-type Cert = { id: string; company_id: string; is_active: boolean; subject_name: string | null };
+type Cert = { id: string; company_id: string | null; is_active: boolean; subject_name: string | null; is_procurador: boolean };
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "outline", processing: "secondary", completed: "default",
