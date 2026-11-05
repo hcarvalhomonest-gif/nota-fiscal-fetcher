@@ -11,17 +11,17 @@ export function documentationUrl(candidate: string, base = RESTRICTED_DOCS): str
     const url = new URL(candidate, base);
     if (url.origin !== RESTRICTED_ORIGIN || url.username || url.password || url.search || url.hash) return null;
     if (!/^\/API\/SefinNacional\/(?:docs|swagger)\/[a-zA-Z0-9_./-]+$/.test(url.pathname)) return null;
-    if (!/\.(?:json|js)$/.test(url.pathname)) return null;
+    if (!/\.(?:json|js)$/.test(url.pathname) && !/\/swagger-config$/.test(url.pathname)) return null;
     return url.href;
   } catch { return null; }
 }
 
 export function contractCandidates(text: string, base: string): string[] {
-  const candidates = [...text.matchAll(/(?:\burl\s*[:=]|\bsrc\s*=)\s*["']([^"']+)["']/g)]
+  const candidates = [...text.matchAll(/(?:\b(?:url|configUrl|swaggerUrl)\s*[:=]|\bsrc\s*=)\s*["']([^"']+)["']/g)]
     .map(match => documentationUrl(match[1] ?? '', base)).filter((value): value is string => value !== null);
   try {
     const config = JSON.parse(text);
-    for (const item of [config.url, ...(Array.isArray(config.urls) ? config.urls.map((entry: { url?: unknown }) => entry.url) : [])]) {
+    for (const item of [config.url, config.configUrl, config.swaggerUrl, ...(Array.isArray(config.urls) ? config.urls.map((entry: { url?: unknown }) => entry.url) : [])]) {
       if (typeof item === 'string') {
         const url = documentationUrl(item, base);
         if (url) candidates.push(url);
