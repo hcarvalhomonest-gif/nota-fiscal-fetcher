@@ -27,7 +27,8 @@ export function validateIssuanceData(data: Record<string, unknown>, complete = f
   const errors: string[] = [];
   const s = (key: string) => typeof data[key] === 'string' ? data[key] as string : '';
   const date = s('competence');
-  if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(`${date}T12:00:00Z`).toISOString().slice(0, 10) !== date)) errors.push('Competência inválida.');
+  const parsedDate = new Date(`${date}T12:00:00Z`);
+  if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date)) errors.push('Competência inválida.');
   if (s('customer_document') && !/^\d{11}$|^\d{14}$/.test(s('customer_document').replace(/\D/g, ''))) errors.push('Informe CPF ou CNPJ do tomador.');
   for (const field of ['service_municipality', 'customer_municipality']) {
     if (s(field) && !/^\d{7}$/.test(s(field))) errors.push('O código IBGE deve ter 7 dígitos.');

@@ -25,8 +25,8 @@ export const AppLayout = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-background">
-      <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
+    <div className="min-h-screen flex flex-col md:flex-row bg-background">
+      <aside className="w-full md:w-64 md:shrink-0 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
         <div className="px-6 py-5 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
             <img src={monestIcon} alt="Monest" className="h-8 w-8 object-contain" />
@@ -37,7 +37,7 @@ export const AppLayout = () => {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex md:block md:flex-1 overflow-x-auto px-3 py-4 md:space-y-1">
           {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -45,7 +45,7 @@ export const AppLayout = () => {
               end={end}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  "flex shrink-0 items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-primary-foreground"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
@@ -58,7 +58,7 @@ export const AppLayout = () => {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="hidden md:block p-3 border-t border-sidebar-border">
           <div className="px-3 py-2 text-xs text-sidebar-foreground/60 truncate">{user?.email}</div>
           <Button
             variant="ghost"
@@ -71,8 +71,8 @@ export const AppLayout = () => {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto p-8">
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="max-w-6xl mx-auto p-4 sm:p-8">
           <Outlet />
         </div>
       </main>
