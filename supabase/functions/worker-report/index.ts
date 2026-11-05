@@ -4,6 +4,22 @@
 //         invoice?: {...}, error_message?: string }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { classifyInvoice, matchesInvoiceType } from "../_shared/invoice-type.ts";
+import { readNfseEvent } from "../_shared/nfse-event.ts";
+import { XMLParser } from "npm:fast-xml-parser@5.2.5";
+
+// Texto puro (sem conversão numérica): chaves de 50 dígitos perdem precisão como número.
+const eventParser = new XMLParser({ ignoreAttributes: false, parseTagValue: false, removeNSPrefix: true });
+
+async function markCancelled(admin: any, job: any, chave: string) {
+  const { data: companyJobs, error } = await admin.from("download_jobs").select("id")
+    .eq("owner_id", job.owner_id).eq("company_id", job.company_id);
+  if (error) throw error;
+  const ids = (companyJobs ?? []).map((row: { id: string }) => row.id);
+  if (!ids.length) return;
+  const { error: updateError } = await admin.from("invoices").update({ cancelada: true })
+    .eq("owner_id", job.owner_id).eq("chave_acesso", chave).in("job_id", ids);
+  if (updateError) throw updateError;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,6 +62,21 @@ Deno.serve(async (req) => {
 
     if (action === "add_invoice") {
       const inv = body.invoice ?? {};
+      // Proteção no servidor: mesmo que o worker da VPS esteja desatualizado,
+      // eventos (cancelamento etc.) nunca viram nota nem entram na contagem.
+      if (inv.xml_base64) {
+        let event = { isEvent: false, cancelledKey: null as string | null };
+        try {
+          const xmlText = new TextDecoder().decode(Uint8Array.from(atob(inv.xml_base64), (c) => c.charCodeAt(0)));
+          event = readNfseEvent(eventParser.parse(xmlText));
+        } catch (_) { /* XML ilegível: segue como nota */ }
+        if (event.isEvent) {
+          if (event.cancelledKey) await markCancelled(admin, job, event.cancelledKey);
+          return new Response(JSON.stringify({ success: true, skipped: true, event: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
       const { data: company } = await admin.from("companies").select("cnpj").eq("id", job.company_id).single();
       const tipo = classifyInvoice(inv.prestador_cnpj, inv.tomador_documento, company?.cnpj ?? "");
       if (!matchesInvoiceType(job.invoice_type ?? "ambas", tipo)) {
@@ -153,23 +184,18 @@ Deno.serve(async (req) => {
 
     if (action === "cancel_invoice") {
       if (typeof body.chave_acesso !== "string" || !/^\d{50}$/.test(body.chave_acesso)) throw new Error("Invalid cancellation key");
-      const { data: companyJobs, error } = await admin.from("download_jobs").select("id")
-        .eq("owner_id", job.owner_id).eq("company_id", job.company_id);
-      if (error) throw error;
-      const ids = (companyJobs ?? []).map((row) => row.id);
-      if (ids.length) {
-        const { error: updateError } = await admin.from("invoices").update({ cancelada: true })
-          .eq("owner_id", job.owner_id).eq("chave_acesso", body.chave_acesso).in("job_id", ids);
-        if (updateError) throw updateError;
-      }
+      await markCancelled(admin, job, body.chave_acesso);
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "finish") {
+      // O total é o que foi realmente gravado, não o que o worker diz ter visto.
+      const { count } = await admin.from("invoices").select("id", { count: "exact", head: true }).eq("job_id", job.id);
       await admin.from("download_jobs").update({
         status: "completed",
         finished_at: new Date().toISOString(),
-        total_invoices: body.total_invoices ?? job.downloaded_invoices,
+        total_invoices: count ?? job.downloaded_invoices,
+        downloaded_invoices: count ?? job.downloaded_invoices,
       }).eq("id", job.id);
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
