@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const { company_id, certificate_id, period_start, period_end } = await req.json();
 
     // Basic validation
-    if (!company_id || !certificate_id || !period_start || !period_end) {
+    if (!company_id || !period_start || !period_end) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -55,14 +55,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify company and certificate ownership via RLS
-    const { data: cert } = await supabase
-      .from("certificates")
-      .select("id, company_id, is_active")
-      .eq("id", certificate_id)
-      .maybeSingle();
-    if (!cert || cert.company_id !== company_id || !cert.is_active) {
-      return new Response(JSON.stringify({ error: "Invalid certificate for this company" }), {
+    // Monest procurador first; client's own certificate as fallback.
+    const { data: procs } = await supabase
+      .from("certificates").select("id")
+      .eq("is_procurador", true).eq("is_active", true)
+      .order("created_at", { ascending: false }).limit(1);
+    const { data: clientCerts } = await supabase
+      .from("certificates").select("id")
+      .eq("company_id", company_id).eq("is_active", true)
+      .order("created_at", { ascending: false }).limit(1);
+    const procId = procs?.[0]?.id ?? null;
+    let clientId: string | null = clientCerts?.[0]?.id ?? null;
+    if (certificate_id) {
+      const { data: c } = await supabase.from("certificates")
+        .select("id, company_id, is_active").eq("id", certificate_id).maybeSingle();
+      if (!c || c.company_id !== company_id || !c.is_active) {
+        return new Response(JSON.stringify({ error: "Invalid certificate for this company" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      clientId = c.id;
+    }
+    const primaryId = procId ?? clientId;
+    const fallbackId = procId ? clientId : null;
+    if (!primaryId) {
+      return new Response(JSON.stringify({ error: "Nenhum certificado disponível (cadastre o certificado procurador da Monest ou o da empresa)" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -72,7 +89,8 @@ Deno.serve(async (req) => {
       .insert({
         owner_id: user.id,
         company_id,
-        certificate_id,
+        certificate_id: primaryId,
+        fallback_certificate_id: fallbackId,
         period_start,
         period_end,
         status: "pending",

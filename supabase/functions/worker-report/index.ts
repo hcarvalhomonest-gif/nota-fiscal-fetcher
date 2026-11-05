@@ -70,7 +70,13 @@ Deno.serve(async (req) => {
         pdfPath = path;
       }
 
+      const { data: company } = await admin.from("companies").select("cnpj").eq("id", job.company_id).single();
+      const digits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+      const tipo = inv.prestador_cnpj && company && digits(inv.prestador_cnpj) !== digits(company.cnpj)
+        ? "tomada" : "emitida";
+
       const { error: insErr } = await admin.from("invoices").insert({
+        tipo,
         job_id: job.id,
         owner_id: job.owner_id,
         chave_acesso: inv.chave_acesso ?? null,

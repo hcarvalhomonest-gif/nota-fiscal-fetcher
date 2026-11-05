@@ -62,24 +62,23 @@ Deno.serve(async (req) => {
 
     if (updErr) throw updErr;
 
-    // Fetch certificate
-    const { data: cert, error: cErr } = await admin
-      .from("certificates")
-      .select("*")
-      .eq("id", job.certificate_id)
-      .single();
-    if (cErr || !cert) throw new Error("Certificate not found");
-
-    const password = await decryptPassword(cert.password_encrypted, cert.password_iv);
-
-    // Download .pfx from storage
-    const { data: file, error: dlErr } = await admin.storage
-      .from("certificates")
-      .download(cert.storage_path);
-    if (dlErr || !file) throw new Error("Failed to download certificate file");
-    const buf = new Uint8Array(await file.arrayBuffer());
-    let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-    const pfxB64 = btoa(bin);
+    const loadCert = async (id: string) => {
+      const { data: cert, error: cErr } = await admin
+        .from("certificates").select("*").eq("id", id).single();
+      if (cErr || !cert) throw new Error("Certificate not found");
+      const password = await decryptPassword(cert.password_encrypted, cert.password_iv);
+      const { data: file, error: dlErr } = await admin.storage
+        .from("certificates").download(cert.storage_path);
+      if (dlErr || !file) throw new Error("Failed to download certificate file");
+      const buf = new Uint8Array(await file.arrayBuffer());
+      let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      return { pfx_base64: btoa(bin), password, is_procurador: !!cert.is_procurador };
+    };
+    const certificate = await loadCert(job.certificate_id);
+    let fallback_certificate = null;
+    if (job.fallback_certificate_id) {
+      try { fallback_certificate = await loadCert(job.fallback_certificate_id); } catch { /* ignore */ }
+    }
 
     // Fetch company info
     const { data: company } = await admin
@@ -94,10 +93,8 @@ Deno.serve(async (req) => {
         period_end: job.period_end,
       },
       company,
-      certificate: {
-        pfx_base64: pfxB64,
-        password,
-      },
+      certificate,
+      fallback_certificate,
     }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

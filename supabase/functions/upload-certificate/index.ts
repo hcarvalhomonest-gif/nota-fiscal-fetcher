@@ -52,9 +52,11 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { company_id, password, file_base64, file_name, subject_name, expires_at } = body;
+    const { password, file_base64, file_name, subject_name, expires_at } = body;
+    const is_procurador = body.is_procurador === true;
+    const company_id: string | null = is_procurador ? null : body.company_id;
 
-    if (!company_id || !password || !file_base64 || !file_name) {
+    if ((!is_procurador && !company_id) || !password || !file_base64 || !file_name) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -68,6 +70,7 @@ Deno.serve(async (req) => {
     }
 
     // Verify the company belongs to the user (RLS will enforce, but check explicitly)
+    if (!is_procurador) {
     const { data: company, error: cErr } = await supabase
       .from("companies").select("id").eq("id", company_id).maybeSingle();
     if (cErr || !company) {
@@ -76,10 +79,11 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    }
 
     // Upload the .pfx into the user's folder in 'certificates' bucket
     const cleanName = file_name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `${user.id}/${company_id}/${Date.now()}_${cleanName}`;
+    const path = `${user.id}/${company_id ?? "procurador"}/${Date.now()}_${cleanName}`;
     const bytes = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
 
     const { error: upErr } = await supabase.storage
@@ -98,6 +102,7 @@ Deno.serve(async (req) => {
       .from("certificates")
       .insert({
         company_id,
+        is_procurador,
         owner_id: user.id,
         storage_path: path,
         password_encrypted: ciphertext,
