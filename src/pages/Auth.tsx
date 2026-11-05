@@ -1,3 +1,4 @@
+import monestIcon from "@/assets/monest-icon.png";
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
@@ -76,9 +77,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
       <div className="w-full max-w-md">
         <Link to="/" className="flex items-center justify-center gap-2 mb-6">
-          <div className="h-10 w-10 rounded-md bg-gradient-primary flex items-center justify-center font-display font-bold text-primary-foreground text-lg">
-            N
-          </div>
+          <img src={monestIcon} alt="Monest" className="h-10 w-10 object-contain" />
           <span className="font-display font-bold text-xl">Monest Notas</span>
         </Link>
 
