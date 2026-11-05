@@ -91,7 +91,6 @@ const Certificates = () => {
     const expires = (fd.get("expires_at") as string) ?? "";
     const isProc = mode === "procurador";
 
-    if (isProc && represented.length === 0) { toast({ title: "Escolha ao menos uma empresa representada", variant: "destructive" }); return; }
     if (!isProc && !companyId) { toast({ title: "Selecione a empresa", variant: "destructive" }); return; }
     if (!file || file.size === 0) { toast({ title: "Selecione o arquivo .pfx", variant: "destructive" }); return; }
     if (file.size > 5 * 1024 * 1024) { toast({ title: "Arquivo muito grande (>5MB)", variant: "destructive" }); return; }
@@ -148,7 +147,7 @@ const Certificates = () => {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-3xl font-bold mb-1">Certificados</h1>
-        <p className="text-muted-foreground">O certificado da Monest acessa o portal como procurador das empresas escolhidas. O certificado do cliente é opcional e serve de reserva.</p>
+        <p className="text-muted-foreground">Os certificados da Monest ficam guardados aqui; ao iniciar um download você escolhe qual usar e qual empresa ele representa. O certificado do cliente é opcional e serve de reserva.</p>
       </div>
 
       {/* Monest procurador */}
@@ -175,17 +174,11 @@ const Certificates = () => {
                   <div className="text-sm text-muted-foreground">{c.storage_path.split("/").pop()}{fmtVal(c)}</div>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="outline" size="sm" onClick={() => { setRepresented(c.represented_company_ids); setEditing(c); }}>
-                    <Pencil className="h-4 w-4 mr-2" /> Empresas
-                  </Button>
+
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(c)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {reps.length === 0 ? <span className="text-sm text-warning">Nenhuma empresa vinculada</span>
-                  : reps.map((r) => <Badge key={r.id} variant="secondary">{r.trade_name || r.legal_name} · {r.cnpj}</Badge>)}
               </div>
             </Card>
           );
@@ -231,10 +224,7 @@ const Certificates = () => {
           </DialogHeader>
           <form onSubmit={handleUpload} className="space-y-3">
             {mode === "procurador" ? (
-              <div>
-                <Label>Empresas que a Monest representa</Label>
-                <CompanyPicker companies={companies} value={represented} onChange={setRepresented} />
-              </div>
+              <p className="text-sm text-muted-foreground">Fica guardado no repositório. A empresa representada é escolhida na hora de iniciar cada download.</p>
             ) : (
               <div>
                 <Label>Empresa</Label>

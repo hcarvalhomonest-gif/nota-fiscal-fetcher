@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
     const { data: procs } = await supabase
       .from("certificates").select("id")
       .eq("is_procurador", true).eq("is_active", true)
-      .contains("represented_company_ids", [company_id])
       .order("created_at", { ascending: false }).limit(1);
     const { data: clientCerts } = await supabase
       .from("certificates").select("id")
@@ -69,11 +68,16 @@ Deno.serve(async (req) => {
     let clientId: string | null = clientCerts?.[0]?.id ?? null;
     if (certificate_id) {
       const { data: c } = await supabase.from("certificates")
-        .select("id, company_id, is_active").eq("id", certificate_id).maybeSingle();
-      if (!c || c.company_id !== company_id || !c.is_active) {
+        .select("id, company_id, is_active, is_procurador").eq("id", certificate_id).maybeSingle();
+      if (!c || !c.is_active || (!c.is_procurador && c.company_id !== company_id)) {
         return new Response(JSON.stringify({ error: "Invalid certificate for this company" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+      if (c.is_procurador) {
+        const primary = c.id;
+        const fallback = clientId;
+        return await insertJob(primary, fallback);
       }
       clientId = c.id;
     }
