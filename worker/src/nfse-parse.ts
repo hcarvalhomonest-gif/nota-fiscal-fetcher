@@ -14,6 +14,7 @@
 
 import { XMLParser } from "fast-xml-parser";
 import { type NfseMapped, nfseMappedSchema } from "./nfse-schema.js";
+import { readNfseEvent, type NfseEventInfo } from "../../supabase/functions/_shared/nfse-event.js";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -119,14 +120,21 @@ function detectCancelado(root: unknown): boolean {
 
 // ---------- Parser principal ----------
 
-export function parseCancellationEvent(xmlText: string): string | null {
-  const tree = parser.parse(xmlText);
-  const event = pick(tree, "procEventoNFSe", "evento", "infEvento") ?? pick(tree, "evento", "infEvento");
-  if (!event) return null;
-  const type = asString(pick(event, "tpEvento"));
-  const cancelled = type === "101000" || Boolean(pick(event, "e101101")) || Boolean(pick(event, "e101103"));
-  const key = asString(pick(event, "chNFSe"));
-  return cancelled && key && /^\d{50}$/.test(key) ? key : null;
+// Parser sem conversão numérica: a chave de 50 dígitos perderia precisão como number.
+const textParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: "@_",
+  parseTagValue: false,
+  trimValues: true,
+  removeNSPrefix: true,
+});
+
+/** Identifica se o XML é um evento (nunca uma nota) e, se cancelar, a chave da nota afetada. */
+export function parseEvent(
+  xmlText: string,
+  envelope?: { tpEvento?: string | null; chNFSe?: string | null },
+): NfseEventInfo {
+  return readNfseEvent(textParser.parse(xmlText), envelope);
 }
 
 export function parseNfseXml(xmlText: string): NfseMapped {

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { FileStack, FileText, FileCode, Archive, Loader2, FileSpreadsheet, ChevronDown, ChevronRight } from "lucide-react";
-import { isMonthOpen } from "@/lib/fiscal-rules";
+import { invoiceStatus, isMonthOpen } from "@/lib/fiscal-rules";
+import { Badge } from "@/components/ui/badge";
 
 type Invoice = {
   id: string; chave_acesso: string | null; numero: string | null; serie: string | null;
@@ -14,7 +15,7 @@ type Invoice = {
   tomador_nome: string | null; tomador_documento: string | null;
   valor_total: number | null; valor_servicos: number | null;
   xml_path: string | null; pdf_path: string | null; job_id: string;
-  created_at: string;
+  created_at: string; cancelada: boolean | null;
 };
 
 const MESES_PT = [
@@ -141,6 +142,7 @@ const Invoices = () => {
         DtEmissao: fmtData(i.data_emissao),
         DtDownload: fmtDataHora(i.created_at),
         Chave: i.chave_acesso ?? "",
+        Situacao: invoiceStatus(i.cancelada),
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
       // Formata coluna "Valor" como moeda BR
@@ -151,7 +153,7 @@ const Invoices = () => {
       }
       ws["!cols"] = [
         { wch: 12 }, { wch: 18 }, { wch: 40 }, { wch: 18 }, { wch: 40 },
-        { wch: 10 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 20 }, { wch: 48 },
+        { wch: 10 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 20 }, { wch: 48 }, { wch: 14 },
       ];
       const wb = XLSX.utils.book_new();
       // Nome de aba do Excel não pode conter : \ / ? * [ ] e tem limite de 31 chars
@@ -192,6 +194,7 @@ const Invoices = () => {
           {grupos.map(([key, invs]) => {
             const open = isMonthOpen(openMonths, key);
             const total = invs.reduce((s, i) => s + (i.valor_total ?? 0), 0);
+            const canceladas = invs.filter((i) => i.cancelada === true).length;
             return (
               <Card key={key} className="overflow-hidden">
                 <div className="p-4 flex items-center justify-between gap-3 bg-muted/30 flex-wrap">
@@ -205,7 +208,8 @@ const Invoices = () => {
                     {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     <span className="font-semibold text-lg">{competenciaLabel(key)}</span>
                     <span className="text-sm text-muted-foreground">
-                      · {invs.length} {invs.length === 1 ? "nota" : "notas"} · R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      · {invs.length} {invs.length === 1 ? "nota" : "notas"}
+                      {canceladas > 0 && ` (${canceladas} ${canceladas === 1 ? "cancelada" : "canceladas"})`} · R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
                   </Button>
                   <div className="flex gap-2">
@@ -243,6 +247,7 @@ const Invoices = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-sm font-medium">Nº {inv.numero ?? "—"}</span>
+                            {inv.cancelada === true && <Badge variant="destructive">Cancelada</Badge>}
                             {inv.data_emissao && (
                               <span className="text-xs text-muted-foreground">
                                 {new Date(inv.data_emissao).toLocaleDateString("pt-BR")}

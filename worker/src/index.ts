@@ -42,7 +42,7 @@ import {
   type LoteDFeItem,
   type LoteDFeResponse,
 } from "./nfse-schema.js";
-import { parseNfseXml, parseCancellationEvent } from "./nfse-parse.js";
+import { parseNfseXml, parseEvent } from "./nfse-parse.js";
 import { classifyInvoice, matchesInvoiceType } from "../../supabase/functions/_shared/invoice-type.js";
 
 const {
@@ -176,7 +176,11 @@ async function report(payload: Record<string, unknown>) {
     },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) console.error("report failed", res.status, await res.text());
+  if (!res.ok) {
+    console.error("report failed", res.status, await res.text());
+    return null;
+  }
+  return (await res.json().catch(() => null)) as { success?: boolean; skipped?: boolean } | null;
 }
 
 function bytesToB64(buf: ArrayBuffer | Uint8Array): string {
@@ -266,12 +270,12 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
     for (const item of lotes as LoteDFeItem[]) {
       try {
         const { xmlText, xmlBytes } = descompactarXml(item.ArquivoXml);
-        const cancellationKey = parseCancellationEvent(xmlText);
-        if (cancellationKey) {
-          cancelledKeys.add(cancellationKey);
+        // Eventos (cancelamento, substituição…) nunca viram nota nem entram na contagem.
+        const event = parseEvent(xmlText, { tpEvento: item.tpEvento, chNFSe: item.chNFSe });
+        if (event.isEvent) {
+          if (event.cancelledKey) cancelledKeys.add(event.cancelledKey);
           continue;
         }
-        if (item.tpEvento && !item.ChaveAcesso) continue;
         const meta = parseNfseXml(xmlText);
 
         // Coerência: se o JSON traz ChaveAcesso, deve bater com a do XML
@@ -312,7 +316,7 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
           }
         }
 
-        await report({
+        const result = await report({
           job_id: j.id,
           worker_token: j.worker_token,
           action: "add_invoice",
@@ -355,7 +359,7 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
             pdf_base64: pdfB64,
           },
         });
-        totalReportadas++;
+        if (result?.success && !result.skipped) totalReportadas++;
         await sleep(REQ_DELAY);
       } catch (e) {
         console.error("falha ao processar item NSU", item.NSU, e);
@@ -373,6 +377,7 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
     await sleep(REQ_DELAY);
   }
 
+  console.log("[job", j.id, "] notas:", totalReportadas, "· cancelamentos encontrados:", cancelledKeys.size);
   for (const chave of cancelledKeys) {
     await report({ job_id: j.id, worker_token: j.worker_token, action: "cancel_invoice", chave_acesso: chave });
   }
