@@ -79,7 +79,7 @@ const Auth = () => {
           <div className="h-10 w-10 rounded-md bg-gradient-primary flex items-center justify-center font-display font-bold text-primary-foreground text-lg">
             N
           </div>
-          <span className="font-display font-bold text-xl">NotaSync</span>
+          <span className="font-display font-bold text-xl">Monest Notas</span>
         </Link>
 
         <Card className="p-6 shadow-elegant">

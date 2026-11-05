@@ -12,7 +12,7 @@ import { Plus, Trash2, KeyRound, Loader2 } from "lucide-react";
 
 type Cert = {
   id: string; storage_path: string; subject_name: string | null;
-  expires_at: string | null; is_active: boolean; company_id: string;
+  expires_at: string | null; is_active: boolean; company_id: string | null; is_procurador: boolean;
 };
 type Company = { id: string; cnpj: string; legal_name: string; trade_name: string | null };
 
@@ -52,6 +52,7 @@ const Certificates = () => {
     const subject = (fd.get("subject") as string) ?? "";
     const expires = (fd.get("expires_at") as string) ?? "";
 
+    const isProc = companyId === "procurador";
     if (!companyId) { toast({ title: "Selecione a empresa", variant: "destructive" }); return; }
     if (!file || file.size === 0) { toast({ title: "Selecione o arquivo .pfx", variant: "destructive" }); return; }
     if (file.size > 5 * 1024 * 1024) { toast({ title: "Arquivo muito grande (>5MB)", variant: "destructive" }); return; }
@@ -62,7 +63,8 @@ const Certificates = () => {
       const file_base64 = await fileToBase64(file);
       const { data, error } = await supabase.functions.invoke("upload-certificate", {
         body: {
-          company_id: companyId,
+          company_id: isProc ? null : companyId,
+          is_procurador: isProc,
           password,
           file_base64,
           file_name: file.name,
@@ -91,18 +93,18 @@ const Certificates = () => {
     load();
   };
 
-  const companyOf = (id: string) => companies.find((c) => c.id === id);
+  const companyOf = (id: string | null) => companies.find((c) => c.id === id);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold mb-1">Certificados A1</h1>
-          <p className="text-muted-foreground">Arquivo .pfx + senha. Tudo criptografado no servidor.</p>
+          <p className="text-muted-foreground">Envie o certificado da Monest como procurador; o certificado do cliente é opcional e serve de reserva.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button disabled={companies.length === 0}><Plus className="h-4 w-4 mr-2" /> Novo certificado</Button>
+            <Button><Plus className="h-4 w-4 mr-2" /> Novo certificado</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Upload de certificado A1</DialogTitle></DialogHeader>
@@ -112,6 +114,7 @@ const Certificates = () => {
                 <Select value={companyId} onValueChange={setCompanyId}>
                   <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="procurador">Monest (procurador de todas as empresas)</SelectItem>
                     {companies.map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.trade_name || c.legal_name}</SelectItem>
                     ))}
@@ -159,7 +162,8 @@ const Certificates = () => {
               <Card key={c.id} className="p-4 flex items-center justify-between">
                 <div>
                   <div className="font-display font-semibold flex items-center gap-2">
-                    {co ? (co.trade_name || co.legal_name) : "—"}
+                    {c.is_procurador ? "Monest — procurador" : co ? (co.trade_name || co.legal_name) : "—"}
+                    {c.is_procurador && <Badge>Procurador</Badge>}
                     {expired && <Badge variant="destructive">Expirado</Badge>}
                     {c.is_active && !expired && <Badge variant="secondary">Ativo</Badge>}
                   </div>
