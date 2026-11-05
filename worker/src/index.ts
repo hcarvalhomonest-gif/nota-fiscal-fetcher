@@ -76,10 +76,15 @@ interface JobPayload {
     cnpj: string;
     legal_name: string;
   };
-  certificate: {
-    pfx_base64: string;
-    password: string;
-  };
+  certificate: CertPayload;
+  /** Certificado próprio do cliente, usado se o procurador (Monest) falhar. */
+  fallback_certificate?: CertPayload | null;
+}
+
+interface CertPayload {
+  pfx_base64: string;
+  password: string;
+  is_procurador?: boolean;
 }
 
 interface ParsedPfx {
@@ -380,13 +385,26 @@ async function listAndDownloadInvoices(job: JobPayload, agent: Agent): Promise<n
 
 // ---------- Loop ----------
 
-async function processJob(job: JobPayload) {
-  console.log("processing job", job.job.id);
-  let agent: Agent | undefined;
+async function runWithCert(job: JobPayload, cert: CertPayload): Promise<number> {
+  const agent = createMtlsAgent(pfxToPem(cert.pfx_base64, cert.password));
   try {
-    const pfx = pfxToPem(job.certificate.pfx_base64, job.certificate.password);
-    agent = createMtlsAgent(pfx);
-    const total = await listAndDownloadInvoices(job, agent);
+    return await listAndDownloadInvoices(job, agent);
+  } finally {
+    await agent.close();
+  }
+}
+
+async function processJob(job: JobPayload) {
+  console.log("processing job", job.job.id, "procurador:", !!job.certificate.is_procurador);
+  try {
+    let total: number;
+    try {
+      total = await runWithCert(job, job.certificate);
+    } catch (e) {
+      if (!job.fallback_certificate) throw e;
+      console.warn("[job", job.job.id, "] procurador falhou, tentando certificado do cliente:", e);
+      total = await runWithCert(job, job.fallback_certificate);
+    }
     await report({
       job_id: job.job.id,
       worker_token: job.job.worker_token,
@@ -401,8 +419,6 @@ async function processJob(job: JobPayload) {
       action: "fail",
       error_message: e instanceof Error ? e.message : "Erro desconhecido",
     });
-  } finally {
-    await agent?.close();
   }
 }
 
