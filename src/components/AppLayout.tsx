@@ -34,6 +34,9 @@ export const AppLayout = () => {
               <div className="font-display font-extrabold leading-tight tracking-tight">monest <span className="text-sidebar-primary">notas</span></div>
               <div className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">NFS-e Nacional</div>
             </div>
+            <Button variant="ghost" size="icon" className="ml-auto md:hidden" aria-label="Sair" title="Sair" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
