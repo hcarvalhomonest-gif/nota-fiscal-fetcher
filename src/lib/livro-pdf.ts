@@ -1,5 +1,15 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import monestIcon from "@/assets/monest-icon.png";
+
+const INK: [number, number, number] = [15, 20, 36];
+const VOLT: [number, number, number] = [190, 242, 60];
+const PAPER: [number, number, number] = [236, 239, 245];
+
+async function toDataUrl(url: string): Promise<string> {
+  const blob = await (await fetch(url)).blob();
+  return new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(blob); });
+}
 
 export type LivroInvoice = {
   numero: string | null; serie: string | null; data_emissao: string | null;
@@ -19,7 +29,7 @@ const fmtDoc = (d: string | null) => {
   return d ?? "";
 };
 
-export function gerarLivroPdf(opts: {
+export async function gerarLivroPdf(opts: {
   tipo: LivroTipo; empresa: { legal_name: string; cnpj: string };
   competencia: string; // YYYY-MM
   notas: LivroInvoice[];
@@ -27,44 +37,84 @@ export function gerarLivroPdf(opts: {
   const { tipo, empresa, competencia, notas } = opts;
   const [y, m] = competencia.split("-");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const titulo = tipo === "emitida" ? "Livro de Registro de Serviços Prestados (NFS-e Emitidas)" : "Livro de Registro de Serviços Tomados (NFS-e Recebidas)";
-
-  doc.setFont("helvetica", "bold"); doc.setFontSize(13);
-  doc.text(titulo, 14, 14);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  doc.text(`Contribuinte: ${empresa.legal_name}  —  CNPJ ${fmtDoc(empresa.cnpj)}`, 14, 21);
-  doc.text(`Competência: ${m}/${y}`, 14, 26);
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const logo = await toDataUrl(monestIcon).catch(() => null);
+  const titulo = tipo === "emitida" ? "Livro de Serviços Prestados" : "Livro de Serviços Tomados";
+  const sub = tipo === "emitida" ? "NFS-e emitidas" : "NFS-e recebidas";
 
   const ordenadas = [...notas].sort((a, b) => (a.data_emissao ?? "").localeCompare(b.data_emissao ?? ""));
   let total = 0;
-  const body = ordenadas.map((n) => {
+  const body = ordenadas.map((n, i) => {
     const v = Number(n.valor_total ?? n.valor_servicos ?? 0);
     total += v;
-    const contraparteDoc = tipo === "emitida" ? n.tomador_documento : n.prestador_cnpj;
-    const contraparteNome = tipo === "emitida" ? n.tomador_nome : n.prestador_razao;
+    const cDoc = tipo === "emitida" ? n.tomador_documento : n.prestador_cnpj;
+    const cNome = tipo === "emitida" ? n.tomador_nome : n.prestador_razao;
     return [
+      String(i + 1),
       n.data_emissao ? new Date(n.data_emissao).toLocaleDateString("pt-BR") : "",
-      n.numero ?? "", n.serie ?? "",
-      fmtDoc(contraparteDoc), contraparteNome ?? "",
-      brl(v),
+      n.numero ?? "", n.serie ?? "", fmtDoc(cDoc), cNome ?? "",
+      n.chave_acesso ? n.chave_acesso.slice(-14) : "", brl(v),
     ];
   });
 
+  const header = () => {
+    doc.setFillColor(...INK); doc.rect(0, 0, W, 30, "F");
+    doc.setFillColor(...VOLT); doc.rect(0, 30, W, 1.5, "F");
+    if (logo) doc.addImage(logo, "PNG", 12, 6, 18, 18);
+    doc.setTextColor(...VOLT); doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+    doc.text("monest", 34, 14);
+    doc.setTextColor(...PAPER); doc.setFontSize(12);
+    doc.text(`${titulo}  ·  ${sub}`, 34, 21);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.text(`Competência ${m}/${y}`, W - 12, 14, { align: "right" });
+    doc.text(`${empresa.legal_name}`, W - 12, 19, { align: "right" });
+    doc.text(`CNPJ ${fmtDoc(empresa.cnpj)}`, W - 12, 24, { align: "right" });
+  };
+
+  header();
+  // Resumo
+  doc.setTextColor(...INK);
+  const box = (x: number, label: string, value: string) => {
+    doc.setDrawColor(210, 214, 222); doc.setFillColor(247, 248, 251);
+    doc.roundedRect(x, 37, 70, 16, 2, 2, "FD");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(100, 108, 125);
+    doc.text(label, x + 4, 43);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...INK);
+    doc.text(value, x + 4, 50);
+  };
+  box(12, "Quantidade de notas", String(ordenadas.length));
+  box(86, "Valor total", brl(total));
+  box(160, "Competência", `${m}/${y}`);
+
   autoTable(doc, {
-    startY: 31,
-    head: [["Emissão", "Número", "Série", tipo === "emitida" ? "CPF/CNPJ Tomador" : "CNPJ Prestador", tipo === "emitida" ? "Tomador" : "Prestador", "Valor"]],
+    startY: 59,
+    margin: { top: 37, left: 12, right: 12, bottom: 16 },
+    head: [["#", "Emissão", "Número", "Série", tipo === "emitida" ? "CPF/CNPJ Tomador" : "CNPJ Prestador", tipo === "emitida" ? "Tomador" : "Prestador", "Chave (final)", "Valor"]],
     body,
-    foot: [["", "", "", "", `Total (${ordenadas.length} notas)`, brl(total)]],
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: [20, 26, 44], textColor: 255 },
-    footStyles: { fillColor: [235, 238, 245], textColor: 20, fontStyle: "bold" },
-    columnStyles: { 5: { halign: "right" } },
+    showFoot: "lastPage",
+    foot: [["", "", "", "", "", `Total — ${ordenadas.length} notas`, "", brl(total)]],
+    styles: { fontSize: 8, cellPadding: 1.8, textColor: INK, lineColor: [225, 228, 235], lineWidth: 0.1 },
+    headStyles: { fillColor: INK, textColor: VOLT, fontStyle: "bold" },
+    footStyles: { fillColor: VOLT, textColor: INK, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [247, 248, 251] },
+    columnStyles: { 0: { cellWidth: 10 }, 7: { halign: "right", cellWidth: 30 } },
     didDrawPage: () => {
-      const page = doc.getNumberOfPages();
-      doc.setFontSize(8);
-      doc.text(`Página ${page} — gerado por Monest em ${new Date().toLocaleString("pt-BR")}`, 14, doc.internal.pageSize.getHeight() - 6);
+      if (doc.getNumberOfPages() > 1) header();
+      doc.setFontSize(7.5); doc.setTextColor(120, 128, 145); doc.setFont("helvetica", "normal");
+      doc.text(`Monest Consultoria · gerado em ${new Date().toLocaleString("pt-BR")}`, 12, H - 7);
+      doc.text(`Página ${doc.getNumberOfPages()}`, W - 12, H - 7, { align: "right" });
     },
   });
+
+  // Assinatura
+  let yEnd = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 22;
+  if (yEnd > H - 25) { doc.addPage(); header(); yEnd = 60; }
+  doc.setDrawColor(...INK);
+  doc.line(30, yEnd, 120, yEnd); doc.line(W - 120, yEnd, W - 30, yEnd);
+  doc.setFontSize(8); doc.setTextColor(...INK);
+  doc.text("Responsável pela empresa", 75, yEnd + 5, { align: "center" });
+  doc.text("Contador responsável — Monest", W - 75, yEnd + 5, { align: "center" });
 
   const nome = `Livro_${tipo === "emitida" ? "Emitidas" : "Tomadas"}_${empresa.cnpj.replace(/\D/g, "")}_${y}-${m}.pdf`;
   doc.save(nome);

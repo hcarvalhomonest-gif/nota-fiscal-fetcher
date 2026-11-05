@@ -10,7 +10,8 @@ const navItems = [
   { to: "/app/empresas", label: "Empresas", icon: Building2 },
   { to: "/app/certificados", label: "Certificados", icon: KeyRound },
   { to: "/app/jobs", label: "Downloads", icon: FileDown },
-  { to: "/app/notas", label: "Notas baixadas", icon: FileStack, BookOpen },
+  { to: "/app/notas", label: "Notas baixadas", icon: FileStack },
+  { to: "/app/livros", label: "Livros fiscais", icon: BookOpen },
 ];
 
 export const AppLayout = () => {
