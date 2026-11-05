@@ -34,3 +34,35 @@ test('ignore external or fiscal URLs advertised in untrusted documentation', asy
   });
   assert.equal(calls, 1);
 });
+test('read Swashbuckle embedded JSON configuration and extensionless docs contract', async () => {
+  const called: string[] = [];
+  const result = await obtainRestrictedContract(async url => {
+    called.push(url);
+    return { status: 200, body: url === RESTRICTED_DOCS
+      ? `var configObject = JSON.parse('{"urls":[{"url":"v1","name":"SEFIN"}]}');`
+      : JSON.stringify({ swagger: '2.0', paths: { '/nfse': { post: {} } } }) };
+  });
+  assert.equal(called[1], `${RESTRICTED_ORIGIN}/API/SefinNacional/docs/v1`);
+  assert.equal(result.report.contract_obtained, true);
+  assert.equal(result.report.production_ready, false);
+});
+test('read quoted url property from initialization script', async () => {
+  const called: string[] = [];
+  const result = await obtainRestrictedContract(async url => {
+    called.push(url);
+    return { status: 200, body: url === RESTRICTED_DOCS ? `<script src="swagger-ui-init.js"></script>`
+      : url.endsWith('.js') ? `const config = {"url": "../swagger/v1/swagger.json"};`
+      : JSON.stringify({ openapi: '3.0.0', paths: {} }) };
+  });
+  assert.equal(called.length, 3);
+  assert.equal(result.report.contract_obtained, true);
+});
+test('encoded configuration cannot bypass restricted documentation host', async () => {
+  let calls = 0;
+  const result = await obtainRestrictedContract(async () => {
+    calls++;
+    return { status: 200, body: `JSON.parse('{"urls":[{"url":"https://example.com/collect"},{"url":"../nfse"}]}')` };
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.report.contract_obtained, false);
+});
