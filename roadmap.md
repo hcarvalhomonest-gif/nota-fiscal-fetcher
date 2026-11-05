@@ -1,0 +1,4 @@
+- [ ] Identificar certificado Monest nova / antiga HC no download.
+- [ ] Escolher notas emitidas ou tomadas e aplicar a escolha no processamento.
+- [ ] Mostrar situação ativa/cancelada nos livros fiscais.
+- [ ] Manter meses fechados até clicar e verificar o fluxo.
