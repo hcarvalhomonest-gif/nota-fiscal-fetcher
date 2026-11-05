@@ -190,12 +190,11 @@ Deno.serve(async (req) => {
 
     if (action === "finish") {
       // O total é o que foi realmente gravado, não o que o worker diz ter visto.
-      const { count } = await admin.from("invoices").select("id", { count: "exact", head: true }).eq("job_id", job.id);
+      // (inclui notas já existentes que foram apenas atualizadas; eventos não contam).
       await admin.from("download_jobs").update({
         status: "completed",
         finished_at: new Date().toISOString(),
-        total_invoices: count ?? job.downloaded_invoices,
-        downloaded_invoices: count ?? job.downloaded_invoices,
+        total_invoices: job.downloaded_invoices ?? 0,
       }).eq("id", job.id);
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
