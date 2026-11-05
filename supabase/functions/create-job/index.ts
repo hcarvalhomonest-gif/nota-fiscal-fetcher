@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
     const { data: procs } = await supabase
       .from("certificates").select("id")
       .eq("is_procurador", true).eq("is_active", true)
-      .contains("represented_company_ids", [company_id])
       .order("created_at", { ascending: false }).limit(1);
     const { data: clientCerts } = await supabase
       .from("certificates").select("id")
@@ -67,18 +66,21 @@ Deno.serve(async (req) => {
       .order("created_at", { ascending: false }).limit(1);
     const procId = procs?.[0]?.id ?? null;
     let clientId: string | null = clientCerts?.[0]?.id ?? null;
+    let forcedProc: string | null = null;
     if (certificate_id) {
       const { data: c } = await supabase.from("certificates")
-        .select("id, company_id, is_active").eq("id", certificate_id).maybeSingle();
-      if (!c || c.company_id !== company_id || !c.is_active) {
+        .select("id, company_id, is_active, is_procurador").eq("id", certificate_id).maybeSingle();
+      if (!c || !c.is_active || (!c.is_procurador && c.company_id !== company_id)) {
         return new Response(JSON.stringify({ error: "Invalid certificate for this company" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      clientId = c.id;
+      if (c.is_procurador) forcedProc = c.id;
+      else clientId = c.id;
     }
-    const primaryId = procId ?? clientId;
-    const fallbackId = procId ? clientId : null;
+    const procChosen = forcedProc ?? procId;
+    const primaryId = procChosen ?? clientId;
+    const fallbackId = procChosen ? clientId : null;
     if (!primaryId) {
       return new Response(JSON.stringify({ error: "Nenhum certificado disponível (cadastre o certificado procurador da Monest ou o da empresa)" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

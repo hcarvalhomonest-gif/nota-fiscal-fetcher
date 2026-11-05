@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, KeyRound, Loader2, ShieldCheck, Pencil } from "lucide-react";
+import { Plus, Trash2, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 
 type Cert = {
   id: string; storage_path: string; subject_name: string | null;
@@ -25,39 +24,6 @@ const fileToBase64 = (file: File) => new Promise<string>((res, rej) => {
   r.readAsDataURL(file);
 });
 
-const CompanyPicker = ({ companies, value, onChange }: {
-  companies: Company[]; value: string[]; onChange: (v: string[]) => void;
-}) => {
-  const [q, setQ] = useState("");
-  const list = companies.filter((c) =>
-    `${c.legal_name} ${c.trade_name ?? ""} ${c.cnpj}`.toLowerCase().includes(q.toLowerCase()));
-  const all = list.length > 0 && list.every((c) => value.includes(c.id));
-  return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <Input placeholder="Buscar por nome ou CNPJ…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <Button type="button" variant="outline" onClick={() =>
-          onChange(all ? value.filter((id) => !list.some((c) => c.id === id))
-            : Array.from(new Set([...value, ...list.map((c) => c.id)])))}>
-          {all ? "Desmarcar" : "Marcar todas"}
-        </Button>
-      </div>
-      <div className="max-h-56 overflow-auto rounded-md border border-border divide-y divide-border">
-        {list.length === 0 && <div className="p-3 text-sm text-muted-foreground">Nenhuma empresa cadastrada.</div>}
-        {list.map((c) => (
-          <label key={c.id} className="flex items-center gap-3 p-2.5 text-sm cursor-pointer hover:bg-muted/50">
-            <Checkbox checked={value.includes(c.id)} onCheckedChange={(ch) =>
-              onChange(ch ? [...value, c.id] : value.filter((x) => x !== c.id))} />
-            <span className="flex-1">{c.trade_name || c.legal_name}</span>
-            <span className="text-muted-foreground font-mono text-xs">{c.cnpj}</span>
-          </label>
-        ))}
-      </div>
-      <div className="text-xs text-muted-foreground">{value.length} empresa(s) selecionada(s)</div>
-    </div>
-  );
-};
-
 const Certificates = () => {
   const [certs, setCerts] = useState<Cert[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -65,7 +31,6 @@ const Certificates = () => {
   const [loading, setLoading] = useState(false);
   const [companyId, setCompanyId] = useState("");
   const [represented, setRepresented] = useState<string[]>([]);
-  const [editing, setEditing] = useState<Cert | null>(null);
   const { toast } = useToast();
 
   const load = async () => {
@@ -91,7 +56,6 @@ const Certificates = () => {
     const expires = (fd.get("expires_at") as string) ?? "";
     const isProc = mode === "procurador";
 
-    if (isProc && represented.length === 0) { toast({ title: "Escolha ao menos uma empresa representada", variant: "destructive" }); return; }
     if (!isProc && !companyId) { toast({ title: "Selecione a empresa", variant: "destructive" }); return; }
     if (!file || file.size === 0) { toast({ title: "Selecione o arquivo .pfx", variant: "destructive" }); return; }
     if (file.size > 5 * 1024 * 1024) { toast({ title: "Arquivo muito grande (>5MB)", variant: "destructive" }); return; }
@@ -122,15 +86,6 @@ const Certificates = () => {
     }
   };
 
-  const saveRepresented = async () => {
-    if (!editing) return;
-    const { error } = await supabase.from("certificates")
-      .update({ represented_company_ids: represented }).eq("id", editing.id);
-    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Empresas atualizadas" });
-    setEditing(null); load();
-  };
-
   const handleDelete = async (cert: Cert) => {
     if (!confirm("Remover este certificado?")) return;
     await supabase.storage.from("certificates").remove([cert.storage_path]);
@@ -148,7 +103,7 @@ const Certificates = () => {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-3xl font-bold mb-1">Certificados</h1>
-        <p className="text-muted-foreground">O certificado da Monest acessa o portal como procurador das empresas escolhidas. O certificado do cliente é opcional e serve de reserva.</p>
+        <p className="text-muted-foreground">Os certificados da Monest ficam guardados aqui; ao iniciar um download você escolhe qual usar e qual empresa ele representa. O certificado do cliente é opcional e serve de reserva.</p>
       </div>
 
       {/* Monest procurador */}
@@ -163,7 +118,6 @@ const Certificates = () => {
           <Card className="p-6 text-sm text-muted-foreground">Nenhum certificado da Monest enviado ainda.</Card>
         ) : procs.map((c) => {
           const expired = c.expires_at && new Date(c.expires_at) < new Date();
-          const reps = c.represented_company_ids.map(companyOf).filter(Boolean) as Company[];
           return (
             <Card key={c.id} className="p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -175,17 +129,11 @@ const Certificates = () => {
                   <div className="text-sm text-muted-foreground">{c.storage_path.split("/").pop()}{fmtVal(c)}</div>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="outline" size="sm" onClick={() => { setRepresented(c.represented_company_ids); setEditing(c); }}>
-                    <Pencil className="h-4 w-4 mr-2" /> Empresas
-                  </Button>
+
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(c)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {reps.length === 0 ? <span className="text-sm text-warning">Nenhuma empresa vinculada</span>
-                  : reps.map((r) => <Badge key={r.id} variant="secondary">{r.trade_name || r.legal_name} · {r.cnpj}</Badge>)}
               </div>
             </Card>
           );
@@ -231,10 +179,7 @@ const Certificates = () => {
           </DialogHeader>
           <form onSubmit={handleUpload} className="space-y-3">
             {mode === "procurador" ? (
-              <div>
-                <Label>Empresas que a Monest representa</Label>
-                <CompanyPicker companies={companies} value={represented} onChange={setRepresented} />
-              </div>
+              <p className="text-sm text-muted-foreground">Fica guardado no repositório. A empresa representada é escolhida na hora de iniciar cada download.</p>
             ) : (
               <div>
                 <Label>Empresa</Label>
@@ -259,13 +204,6 @@ const Certificates = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Empresas representadas pela Monest</DialogTitle></DialogHeader>
-          <CompanyPicker companies={companies} value={represented} onChange={setRepresented} />
-          <Button onClick={saveRepresented} className="w-full">Salvar</Button>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
