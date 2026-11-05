@@ -34,14 +34,14 @@ const Jobs = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [companyId, setCompanyId] = useState("");
-  const [certId, setCertId] = useState("");
+  const [certId, setCertId] = useState("auto");
   const { toast } = useToast();
 
   const load = async () => {
     const [j, c, k] = await Promise.all([
       supabase.from("download_jobs").select("*").order("created_at", { ascending: false }),
       supabase.from("companies").select("id, legal_name, trade_name"),
-      supabase.from("certificates").select("id, company_id, is_active, subject_name").eq("is_active", true),
+      supabase.from("certificates").select("id, company_id, is_active, subject_name, is_procurador").eq("is_active", true),
     ]);
     setJobs(j.data ?? []);
     setCompanies(c.data ?? []);
@@ -56,6 +56,7 @@ const Jobs = () => {
   }, []);
 
   const certsForCompany = certs.filter((c) => c.company_id === companyId);
+  const hasProcurador = certs.some((c) => c.is_procurador);
   const companyOf = (id: string) => companies.find((c) => c.id === id);
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -63,13 +64,13 @@ const Jobs = () => {
     const fd = new FormData(e.currentTarget);
     const period_start = fd.get("period_start") as string;
     const period_end = fd.get("period_end") as string;
-    if (!companyId || !certId || !period_start || !period_end) {
+    if (!companyId || !period_start || !period_end) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("create-job", {
-      body: { company_id: companyId, certificate_id: certId, period_start, period_end },
+      body: { company_id: companyId, certificate_id: certId === "auto" ? null : certId, period_start, period_end },
     });
     setLoading(false);
     if (error || (data as { error?: string })?.error) {
@@ -78,7 +79,7 @@ const Jobs = () => {
     }
     toast({ title: "Job criado", description: "Aguardando o worker." });
     setOpen(false);
-    setCompanyId(""); setCertId("");
+    setCompanyId(""); setCertId("auto");
     load();
   };
 
@@ -105,7 +106,7 @@ const Jobs = () => {
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
                 <Label>Empresa</Label>
-                <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setCertId(""); }}>
+                <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setCertId("auto"); }}>
                   <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
                   <SelectContent>
                     {companies.map((c) => (
@@ -119,6 +120,7 @@ const Jobs = () => {
                 <Select value={certId} onValueChange={setCertId} disabled={!companyId}>
                   <SelectTrigger><SelectValue placeholder={companyId ? "Selecione…" : "Escolha uma empresa antes"} /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="auto">{hasProcurador ? "Automático (Monest procurador → cliente)" : "Automático (certificado do cliente)"}</SelectItem>
                     {certsForCompany.map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.subject_name || c.id.slice(0, 8)}</SelectItem>
                     ))}
