@@ -4,3 +4,4 @@
 - [x] Manter meses fechados até clicar; regras cobertas por testes.
 - [ ] Atualizar o worker na VPS e verificar um download real: depende da atualização feita pelo usuário.
 - [ ] Verificar telas com notas/certificados reais: conta disponível para teste não possui esses dados.
+- [ ] Criar área de emissão nacional por empresa com certificados Monest: definir fluxo seguro e validar autorização oficial antes de emissão real.
