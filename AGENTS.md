@@ -1,3 +1,4 @@
 - Shared fiscal rules identify certificates without displaying filenames, because filenames can contain credentials.
 - Download type is persisted per job and enforced in both worker and report endpoint, so mixed ADN batches cannot mix user-selected types.
-- Invoice cancellation is nullable: unknown historical status must never be displayed as active.
+- Invoice cancellation is nullable: unknown historical status must never be displayed as active.- ADN event detection (cancellations) lives in `supabase/functions/_shared/nfse-event.ts` and parses XML without numeric conversion, because events must never be counted as invoices and 50-digit keys lose precision as numbers.
+- `worker-report` updates an existing invoice with the same access key for the company instead of inserting, so re-downloading a month can backfill cancellations without duplicates.
